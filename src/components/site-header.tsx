@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Suspense } from "react";
+import { UserMenu } from "@/components/user-menu";
 import { siteConfig } from "@/config/site";
 
 export function SiteHeader() {
@@ -8,13 +10,16 @@ export function SiteHeader() {
         <Link href="/" className="text-lg font-semibold tracking-tight">
           {siteConfig.name}
         </Link>
-        <nav className="flex items-center gap-5 text-sm text-muted">
+        <nav className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 text-sm text-muted">
           <Link href="/search" className="hover:text-fg">
             Search
           </Link>
           <Link href="/programs" className="hover:text-fg">
             Programs
           </Link>
+          <Suspense fallback={<span className="inline-block h-7 w-16" aria-hidden />}>
+            <UserMenu />
+          </Suspense>
         </nav>
       </div>
     </header>

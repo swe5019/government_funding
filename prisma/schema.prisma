@@ -449,6 +449,8 @@ model User {
   role                 Role      @default(USER)
   acceptedDisclaimerAt DateTime? @db.Timestamptz
   stripeCustomerId     String?   @unique
+  /// Set when a trial starts; a user gets one trial
+  trialUsedAt          DateTime? @db.Timestamptz
   createdAt            DateTime  @default(now()) @db.Timestamptz
   updatedAt            DateTime  @updatedAt @db.Timestamptz
 
@@ -507,6 +509,8 @@ model Subscription {
   cancelAtPeriodEnd    Boolean   @default(false)
   updatedAt            DateTime  @updatedAt @db.Timestamptz
   user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
 }
 
 model Watchlist {
@@ -556,4 +560,11 @@ model AuditLog {
   user      User?    @relation(fields: [userId], references: [id])
 
   @@index([entity, entityId])
+}
+
+/// Processed Stripe webhook events (idempotency: a replayed event is a no-op).
+model StripeEvent {
+  id          String   @id
+  type        String
+  processedAt DateTime @default(now()) @db.Timestamptz
 }

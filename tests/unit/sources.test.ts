@@ -1,7 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { checkBasicAuth } from "@/lib/admin/basic-auth";
+import { describe, expect, it } from "vitest";
 import { parseTickersFile } from "@/lib/sources/edgar/client";
 import { sectorForSic } from "@/lib/sources/edgar/sic";
 import { parseEntity } from "@/lib/sources/sam/client";
@@ -56,26 +55,5 @@ describe("parseEntity (SAM)", () => {
   it("returns null parents when the record has none, and null without a UEI", () => {
     expect(parseEntity({ entityRegistration: { ueiSAM: "ABC" } })?.ultimateParentUei).toBeNull();
     expect(parseEntity({ coreData: {} })).toBeNull();
-  });
-});
-
-describe("checkBasicAuth", () => {
-  afterEach(() => vi.unstubAllEnvs());
-  const header = (u: string, p: string) => "Basic " + Buffer.from(`${u}:${p}`).toString("base64");
-
-  it("is disabled when credentials aren't configured", () => {
-    vi.stubEnv("ADMIN_USERNAME", "");
-    vi.stubEnv("ADMIN_PASSWORD", "");
-    expect(checkBasicAuth(header("", ""))).toBeNull();
-  });
-
-  it("accepts only the configured credentials", () => {
-    vi.stubEnv("ADMIN_USERNAME", "admin");
-    vi.stubEnv("ADMIN_PASSWORD", "s3cret:with:colons");
-    expect(checkBasicAuth(header("admin", "s3cret:with:colons"))).toBe("admin");
-    expect(checkBasicAuth(header("admin", "wrong"))).toBeNull();
-    expect(checkBasicAuth(header("root", "s3cret:with:colons"))).toBeNull();
-    expect(checkBasicAuth(null)).toBeNull();
-    expect(checkBasicAuth("Bearer x")).toBeNull();
   });
 });

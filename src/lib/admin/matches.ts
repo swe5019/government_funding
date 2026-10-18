@@ -136,6 +136,12 @@ export type Decision =
   | { kind: "reopen" }
   | { kind: "correct"; companyCik: string };
 
+/** Who made a review decision (the signed-in admin). */
+export interface Reviewer {
+  id: string | null;
+  email: string;
+}
+
 export interface DecisionTarget {
   /** Apply to every row in this roll-up group... */
   groupId?: string;
@@ -147,7 +153,7 @@ export interface DecisionTarget {
  * Record a reviewer decision. Group decisions skip rows another reviewer already decided
  * (except reopen/correct, which are explicit overrides). Returns the number of rows changed.
  */
-export async function applyDecision(target: DecisionTarget, decision: Decision, reviewer: string): Promise<number> {
+export async function applyDecision(target: DecisionTarget, decision: Decision, reviewer: Reviewer): Promise<number> {
   const where: Prisma.TickerMatchWhereInput = target.groupId
     ? { OR: [{ parentRecipientId: target.groupId }, { recipientId: target.groupId }] }
     : { recipientId: { in: target.recipientIds ?? [] } };
@@ -158,8 +164,8 @@ export async function applyDecision(target: DecisionTarget, decision: Decision, 
   const before = await prisma.tickerMatch.findMany({ where });
   if (!before.length) return 0;
   const now = new Date();
-  const note = `by ${reviewer} (admin)`;
-  const data: Prisma.TickerMatchUpdateManyMutationInput = { reviewedAt: now, notes: note };
+  const note = `by ${reviewer.email}`;
+  const data: Prisma.TickerMatchUncheckedUpdateManyInput = { reviewedAt: now, reviewedById: reviewer.id, notes: note };
   switch (decision.kind) {
     case "approve":
       Object.assign(data, { status: "APPROVED" });
@@ -168,7 +174,7 @@ export async function applyDecision(target: DecisionTarget, decision: Decision, 
       Object.assign(data, { status: "REJECTED" });
       break;
     case "reopen":
-      Object.assign(data, { status: "PENDING", reviewedAt: null, notes: null });
+      Object.assign(data, { status: "PENDING", reviewedAt: null, reviewedById: null, notes: null });
       break;
     case "correct":
       Object.assign(data, { status: "CORRECTED", companyCik: decision.companyCik, confidence: 1, method: "MANUAL" });
@@ -184,11 +190,12 @@ export async function applyDecision(target: DecisionTarget, decision: Decision, 
     await tx.tickerMatch.updateMany({ where: updateWhere, data });
     await tx.auditLog.create({
       data: {
+        userId: reviewer.id,
         action: `ticker_match.${decision.kind}`,
         entity: "TickerMatch",
         entityId: target.groupId ?? (target.recipientIds ?? []).join(","),
         before: before.map((m) => ({ recipientId: m.recipientId, companyCik: m.companyCik, status: m.status, confidence: m.confidence })),
-        after: { decision, reviewer },
+        after: { decision, reviewer: reviewer.email },
       },
     });
   });
@@ -197,21 +204,22 @@ export async function applyDecision(target: DecisionTarget, decision: Decision, 
 }
 
 /** Link recipients that had no match to a company chosen by a reviewer. */
-export async function linkRecipient(recipientId: string, companyCik: string, reviewer: string) {
+export async function linkRecipient(recipientId: string, companyCik: string, reviewer: Reviewer) {
   const rec = await prisma.recipient.findUniqueOrThrow({ where: { id: recipientId } });
   const total = await prisma.recipientAwardMonthly.aggregate({ where: { recipientId, view: "REALTIME" }, _sum: { obligated: true } });
-  const evidence = { root: { id: recipientId, name: rec.name }, reason: `linked manually by ${reviewer}` };
+  const evidence = { root: { id: recipientId, name: rec.name }, reason: `linked manually by ${reviewer.email}` };
+  const review = { reviewedAt: new Date(), reviewedById: reviewer.id, notes: `by ${reviewer.email}` };
   await prisma.$transaction(async (tx) => {
     await tx.tickerMatch.upsert({
       where: { recipientId },
       create: {
         recipientId, companyCik, confidence: 1, method: "MANUAL", status: "CORRECTED", parentRecipientId: recipientId,
-        obligationAtStake: total._sum.obligated, evidence, reviewedAt: new Date(), notes: `by ${reviewer} (admin)`,
+        obligationAtStake: total._sum.obligated, evidence, ...review,
       },
-      update: { companyCik, confidence: 1, method: "MANUAL", status: "CORRECTED", reviewedAt: new Date(), notes: `by ${reviewer} (admin)` },
+      update: { companyCik, confidence: 1, method: "MANUAL", status: "CORRECTED", ...review },
     });
     await tx.auditLog.create({
-      data: { action: "ticker_match.link", entity: "TickerMatch", entityId: recipientId, after: { companyCik, reviewer } },
+      data: { userId: reviewer.id, action: "ticker_match.link", entity: "TickerMatch", entityId: recipientId, after: { companyCik, reviewer: reviewer.email } },
     });
   });
   await rollupCompanyTotals([companyCik]);

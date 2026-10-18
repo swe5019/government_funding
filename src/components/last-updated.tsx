@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { getFreshness } from "@/lib/recipients";
 import type { Viewer } from "@/lib/gating/viewer";
@@ -16,7 +17,15 @@ export async function LastUpdated({ viewer }: { viewer: Viewer }) {
       ) : (
         <>No data loaded yet</>
       )}
-      {delay > 0 && <> · Free plan: records appear {delay} days after publication</>}
+      {delay > 0 && (
+        <>
+          {" "}
+          · Free plan: records appear {delay} days after publication.{" "}
+          <Link href="/pricing" className="text-accent hover:underline">
+            Get daily updates with Pro
+          </Link>
+        </>
+      )}
     </p>
   );
 }

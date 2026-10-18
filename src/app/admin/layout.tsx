@@ -1,9 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { requireAdmin } from "@/lib/admin/require-admin";
 
 export const metadata: Metadata = { title: "Admin", robots: { index: false, follow: false } };
 
-export default function AdminLayout({ children }: LayoutProps<"/admin">) {
+/**
+ * Admin blocks on the auth check before rendering anything, so non-admins get a real 404
+ * and signed-out visitors a real redirect (not a streamed one). Pages and actions re-check.
+ */
+export const instant = false;
+
+export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
+  await requireAdmin();
   return (
     <div className="space-y-6">
       <nav className="flex items-center gap-4 border-b border-line pb-3 text-sm">

@@ -12,8 +12,8 @@ how that relates to their stock. "FedFlow" is a placeholder name, set once in `s
 | 1 | Schema, USAspending ingestion (3-year backfill + daily), basic search | ✅ built |
 | 2 | Recipient → ticker mapping + admin review | ✅ built |
 | 3 | Company and program pages with charts | ✅ built |
-| 4 | Auth, Stripe, tier gating | next |
-| 5 | Watchlists, alerts, screener, CSV export | |
+| 4 | Auth, Stripe, tier gating | ✅ built |
+| 5 | Watchlists, alerts, screener, CSV export | next |
 | 6 | SAM.gov, EDGAR, Federal Register, DoD announcements | |
 | 7 | Tests, monitoring, SEO, deployment guide | |
 
@@ -35,7 +35,8 @@ pnpm ingest edgar-companies --file tests/fixtures/company_tickers_exchange.json
 pnpm ingest match-tickers
 pnpm ingest tag-programs
 MARKET_DATA_PROVIDER=mock pnpm ingest prices      # optional: simulated prices for local charts
-ADMIN_USERNAME=admin ADMIN_PASSWORD=dev MARKET_DATA_PROVIDER=mock pnpm dev
+ADMIN_EMAILS=you@example.com MARKET_DATA_PROVIDER=mock pnpm dev
+# Sign in at /signin: without RESEND_API_KEY the magic link prints in the dev server console.
 # http://localhost:3000/company/LMT, /program/chips-act, /search?q=lockheed, /admin
 ```
 
@@ -84,8 +85,8 @@ inherit the result. Every match stores a confidence score and evidence. At or ab
 a confirmed ticker; below that it is always labeled **"possible match"** and kept out of headline totals.
 Thresholds live in `src/config/mapping.ts`; details in [docs/MAPPING.md](docs/MAPPING.md).
 
-Review at `/admin/matches` (HTTP Basic auth via `ADMIN_USERNAME` / `ADMIN_PASSWORD` until Phase 4 adds
-accounts): approve, reject, correct to any ticker (OTC included), or link unmatched recipients.
+Review at `/admin/matches` (signed-in users listed in `ADMIN_EMAILS`): approve, reject, correct to any
+ticker (OTC included), or link unmatched recipients. Each decision records the reviewer.
 Decisions are audit-logged, apply to a parent's subsidiaries, and are never overwritten by re-matching.
 `/admin/ingestion` shows recent job runs and data freshness.
 
@@ -107,6 +108,15 @@ unset, company pages show award charts only. `mock` generates clearly labeled si
 development and is ignored in production. To add a licensed vendor, implement `MarketDataProvider`
 in one file, register it in `getProvider()`, and check the vendor's display/redistribution terms;
 `pnpm ingest prices` then backfills 3 years and runs daily after matching.
+
+## Accounts, billing and plans
+
+- Sign-in: email magic link (Resend) or Google, via Auth.js with database sessions. New users must
+  acknowledge the "not investment advice" disclaimer at sign-up (`/signin`, or `/welcome` as a fallback).
+- Plans, prices, trial length and feature gates: `src/config/plans.ts`. Every data query goes through
+  `getViewer()` (`src/lib/gating/viewer.ts`), which maps the user's Stripe subscription to a plan.
+- Stripe Checkout (card required, 7-day trial for first-time subscribers), Customer Portal for
+  changes/cancellation, and a webhook that syncs subscription state. Setup: [docs/BILLING.md](docs/BILLING.md).
 
 ## Tests
 

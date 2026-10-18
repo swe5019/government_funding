@@ -112,7 +112,7 @@ describe.skipIf(!url)("ticker mapping (integration)", async () => {
   it("a correction confirms the reviewer's company and survives a full re-match", async () => {
     const exlb = await findCompanyByTicker("exlb");
     expect(exlb?.cik).toBe(EXLB);
-    await applyDecision({ groupId: "EXLABS000001" }, { kind: "correct", companyCik: EXLB }, "tester");
+    await applyDecision({ groupId: "EXLABS000001" }, { kind: "correct", companyCik: EXLB }, { id: null, email: "tester@example.com" });
     await run(true);
     expect(await match("EXLABS000001")).toMatchObject({ companyCik: EXLB, status: "CORRECTED", method: "MANUAL", confidence: 1 });
     expect(await companyTotal(EXLB, false)).toBe(5_000_000);
@@ -121,7 +121,7 @@ describe.skipIf(!url)("ticker mapping (integration)", async () => {
   });
 
   it("rejecting a parent group removes the link for its subsidiaries too, and stays rejected", async () => {
-    await applyDecision({ groupId: "ZFN2JJXBLZT3" }, { kind: "reject" }, "tester");
+    await applyDecision({ groupId: "ZFN2JJXBLZT3" }, { kind: "reject" }, { id: null, email: "tester@example.com" });
     expect((await match("HJ7KQFRMYN63")).status).toBe("REJECTED");
     expect(await companyTotal(LMT, true)).toBe(0);
 
@@ -132,7 +132,7 @@ describe.skipIf(!url)("ticker mapping (integration)", async () => {
   });
 
   it("new subsidiaries of an approved parent inherit the reviewer's decision", async () => {
-    await applyDecision({ groupId: "M7XQ1LZ9K2B4" }, { kind: "approve" }, "tester");
+    await applyDecision({ groupId: "M7XQ1LZ9K2B4" }, { kind: "approve" }, { id: null, email: "tester@example.com" });
     await addRecipient("MUSUB0000001", "MICRON IDAHO FAB LLC", 2_000_000, "M7XQ1LZ9K2B4");
     await run();
     expect(await match("MUSUB0000001")).toMatchObject({ companyCik: MU, method: "UEI_PARENT_ROLLUP", confidence: 0.98 });
@@ -140,7 +140,7 @@ describe.skipIf(!url)("ticker mapping (integration)", async () => {
   });
 
   it("reopening returns rows to automatic matching", async () => {
-    await applyDecision({ groupId: "ZFN2JJXBLZT3" }, { kind: "reopen" }, "tester");
+    await applyDecision({ groupId: "ZFN2JJXBLZT3" }, { kind: "reopen" }, { id: null, email: "tester@example.com" });
     await run(true);
     expect(await match("ZFN2JJXBLZT3")).toMatchObject({ status: "PENDING", companyCik: LMT, confidence: 0.97 });
     expect(await companyTotal(LMT, false)).toBeGreaterThan(0);
