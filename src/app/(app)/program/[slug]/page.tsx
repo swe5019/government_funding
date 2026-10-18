@@ -21,6 +21,7 @@ export async function generateMetadata({ params }: PageProps<"/program/[slug]">)
   return {
     title: program ? `${program.name}: public company recipients` : "Program",
     description: program?.description ?? undefined,
+    alternates: { canonical: `/program/${slug}` },
   };
 }
 

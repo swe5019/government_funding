@@ -5,8 +5,10 @@ import { requireAdmin } from "@/lib/admin/require-admin";
 export const metadata: Metadata = { title: "Admin", robots: { index: false, follow: false } };
 
 /**
- * Admin blocks on the auth check before rendering anything, so non-admins get a real 404
- * and signed-out visitors a real redirect (not a streamed one). Pages and actions re-check.
+ * Admin blocks on the auth check before rendering any admin UI: non-admins get the not-found
+ * page (noindex) and signed-out visitors are redirected to sign in. Once the root shell has
+ * streamed the HTTP status stays 200, so security never relies on the status code. Pages and
+ * actions re-check.
  */
 export const instant = false;
 

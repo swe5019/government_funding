@@ -37,6 +37,13 @@ jobs:
       SAM_API_KEY: ${{ secrets.SAM_API_KEY }}
       MARKET_DATA_PROVIDER: ${{ vars.MARKET_DATA_PROVIDER }}
       MARKET_DATA_API_KEY: ${{ secrets.MARKET_DATA_API_KEY }}
+      # Optional: job failures are reported to Sentry when set.
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+      SENTRY_ENVIRONMENT: production
+      # Needed by the alerts job (Pro watchlist emails) and its links.
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      EMAIL_FROM: ${{ vars.EMAIL_FROM }}
+      NEXT_PUBLIC_APP_URL: ${{ vars.NEXT_PUBLIC_APP_URL }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

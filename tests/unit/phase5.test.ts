@@ -39,3 +39,16 @@ describe("screener filters", () => {
     expect(filtersToQuery({ minGrowth: 25, sort: "growth", sector: undefined })).toBe("minGrowth=25&sort=growth");
   });
 });
+
+import { scrubEvent, scrubUrl } from "@/lib/monitoring/scrub";
+
+describe("monitoring scrub", () => {
+  it("redacts keys in URLs and strips cookies, auth headers and user", () => {
+    expect(scrubUrl("https://api.sam.gov/x?api_key=SECRET&ueiSAM=ABC")).toBe("https://api.sam.gov/x?api_key=[redacted]&ueiSAM=ABC");
+    const ev = scrubEvent({
+      request: { url: "https://app/api/auth/callback?token=t1&email=a@b.c", cookies: { s: "1" }, headers: { Cookie: "x", "User-Agent": "ua", Authorization: "y" } },
+      user: { email: "a@b.c" },
+    });
+    expect(ev).toEqual({ request: { url: "https://app/api/auth/callback?token=[redacted]&email=[redacted]", headers: { "User-Agent": "ua" } } });
+  });
+});

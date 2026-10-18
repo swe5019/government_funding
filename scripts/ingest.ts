@@ -15,6 +15,7 @@ import { samOpportunities } from "@/jobs/sam-opportunities";
 import { samParents } from "@/jobs/sam-parents";
 import { tagPrograms } from "@/jobs/tag-programs";
 import { USASPENDING_LOCK, usaspendingBackfill, usaspendingDaily, usaspendingLoadLocal } from "@/jobs/usaspending";
+import { flushJobMonitoring, initJobMonitoring, reportJobError } from "@/lib/monitoring/jobs";
 import type { FileKind } from "@/lib/sources/usaspending/rows";
 
 const USAGE = `Usage: pnpm ingest <job> [options]
@@ -72,6 +73,7 @@ async function main() {
     console.log(USAGE);
     return;
   }
+  initJobMonitoring(job);
   const kind = values.kind as FileKind | undefined;
   if (kind && kind !== "contracts" && kind !== "assistance") throw new Error(`bad --kind ${kind}`);
   const limit = values.limit ? Number(values.limit) : undefined;
@@ -164,6 +166,7 @@ async function soft(name: string, fn: () => Promise<unknown>) {
   } catch (err) {
     softFailures.push(name);
     console.error(`[${name}] failed:`, err);
+    reportJobError(err, name);
   }
 }
 
@@ -183,6 +186,10 @@ main()
   })
   .catch((err) => {
     console.error(err);
+    reportJobError(err, process.argv[2] ?? "ingest");
     process.exitCode = 1;
   })
-  .finally(closeJobPool);
+  .finally(async () => {
+    await closeJobPool();
+    await flushJobMonitoring();
+  });

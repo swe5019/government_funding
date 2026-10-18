@@ -21,7 +21,7 @@ export async function LastUpdated({ viewer }: { viewer: Viewer }) {
         <>
           {" "}
           · Free plan: records appear {delay} days after publication.{" "}
-          <Link href="/pricing" className="text-accent hover:underline">
+          <Link href="/pricing" className="text-accent underline underline-offset-2">
             Get daily updates with Pro
           </Link>
         </>

@@ -35,3 +35,41 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: fedflow
+          POSTGRES_PASSWORD: fedflow
+          POSTGRES_DB: fedflow_e2e
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U fedflow" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://fedflow:fedflow@localhost:5432/fedflow_e2e
+      DIRECT_URL: postgresql://fedflow:fedflow@localhost:5432/fedflow_e2e
+      E2E_DATABASE_URL: postgresql://fedflow:fedflow@localhost:5432/fedflow_e2e
+      NEXT_PUBLIC_APP_URL: http://localhost:3100
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm db:migrate
+      - run: pnpm build
+      - run: pnpm test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7

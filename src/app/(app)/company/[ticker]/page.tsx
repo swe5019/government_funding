@@ -11,7 +11,9 @@ import { getAnnouncements, getContractFilings } from "@/lib/announcements";
 import { LastUpdated } from "@/components/last-updated";
 import { MatchBadge } from "@/components/match-badge";
 import { SourceLink } from "@/components/source-link";
+import { JsonLd } from "@/components/json-ld";
 import { StatTile } from "@/components/stat-tile";
+import { siteConfig } from "@/config/site";
 import {
   AWARD_EVENT_MIN_USD,
   getAwardEvents,
@@ -34,9 +36,12 @@ import { fillMonths, summarizePeriods } from "@/lib/periods";
 export async function generateMetadata({ params }: PageProps<"/company/[ticker]">): Promise<Metadata> {
   const { ticker } = await params;
   const t = decodeURIComponent(ticker).toUpperCase();
+  const description = `Federal contracts, grants and program awards linked to ${t}, from official U.S. government records. Informational only, not investment advice.`;
   return {
     title: `${t} federal contracts and grants`,
-    description: `Federal contracts, grants and program awards linked to ${t}, from official U.S. government records. Informational only, not investment advice.`,
+    description,
+    alternates: { canonical: `/company/${encodeURIComponent(t)}` },
+    openGraph: { title: `${t} federal contracts and grants`, description, url: `/company/${encodeURIComponent(t)}` },
   };
 }
 
@@ -81,6 +86,19 @@ async function Company({ params }: { params: PageProps<"/company/[ticker]">["par
 
   return (
     <div className="space-y-8">
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "Dataset",
+          name: `${company.ticker} (${company.name}) federal awards`,
+          description: `U.S. federal contract and grant obligations to legal entities linked to ${company.name}, aggregated from USAspending.gov.`,
+          url: `${siteConfig.url}/company/${encodeURIComponent(company.ticker)}`,
+          isBasedOn: "https://www.usaspending.gov",
+          creator: { "@type": "Organization", name: siteConfig.name },
+          license: "https://www.usa.gov/government-works",
+          ...(monthly.length ? { temporalCoverage: `${monthly[0].month.toISOString().slice(0, 7)}/${monthly.at(-1)!.month.toISOString().slice(0, 7)}` } : {}),
+        }}
+      />
       <header className="space-y-1">
         <Link href="/search" className="text-xs text-muted hover:underline">
           ← Search

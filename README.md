@@ -15,7 +15,7 @@ how that relates to their stock. "FedFlow" is a placeholder name, set once in `s
 | 4 | Auth, Stripe, tier gating | ✅ built |
 | 5 | Watchlists, alerts, screener, CSV export | ✅ built |
 | 6 | SAM.gov, EDGAR, Federal Register, DoD announcements | ✅ built |
-| 7 | Tests, monitoring, SEO, deployment guide | next |
+| 7 | Tests, monitoring, SEO, deployment guide | ✅ built |
 
 ## Stack
 
@@ -144,7 +144,18 @@ Limits and defaults are in `src/config/features.ts`; who gets them is `src/confi
 pnpm test                                    # unit tests
 TEST_DATABASE_URL=postgresql://… pnpm test   # + integration tests against a disposable migrated database
 pnpm lint && pnpm typecheck
+pnpm build && pnpm test:e2e                  # Playwright: public pages, gating, admin, axe accessibility
 ```
+
+E2E tests start `next start` on port 3100 against `E2E_DATABASE_URL` (default
+`postgresql://fedflow:fedflow@localhost:5432/fedflow_e2e`), which global setup migrates, wipes and
+reseeds with the fixtures plus a free, a Pro and an admin user. Run `pnpm exec playwright install chromium`
+once, or set `PW_CHROMIUM_PATH` to an existing Chromium.
+
+## Deployment and monitoring
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md): Neon, Vercel, Resend, Stripe, Google, Sentry, GitHub
+Actions secrets, the first-load runbook, `/api/health`, and a release checklist.
 
 ## Layout
 
@@ -155,5 +166,6 @@ src/app/           routes: (marketing) home + legal pages, (app) search + recipi
 src/config/        site name, plans/pricing/feature gates, data + mapping settings
 src/jobs/          job runner, USAspending loaders, rollups
 src/lib/           db client, gating, search, source API clients, name normalization
-tests/             unit + integration tests, fixtures
+tests/             unit + integration tests (Vitest), e2e (Playwright), fixtures
+docs/              mapping, data sources, billing, deployment
 ```
