@@ -5,6 +5,7 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { dataConfig } from "@/config/data";
 import { retry, sleep } from "@/lib/retry";
+import { HttpError, isRetryable } from "@/lib/sources/http";
 import type { FileKind } from "./rows";
 
 /**
@@ -15,15 +16,6 @@ import type { FileKind } from "./rows";
 const cfg = dataConfig.usaspending;
 const CONTRACT_TYPES = ["A", "B", "C", "D", "IDV_A", "IDV_B", "IDV_B_A", "IDV_B_B", "IDV_B_C", "IDV_C", "IDV_D", "IDV_E"];
 const ASSISTANCE_TYPES = ["02", "03", "04", "05", "06", "07", "08", "09", "10", "11"];
-
-export class HttpError extends Error {
-  constructor(
-    public status: number,
-    message: string,
-  ) {
-    super(message);
-  }
-}
 
 let lastRequestAt = 0;
 
@@ -41,12 +33,6 @@ async function politeFetch(url: string, init?: RequestInit): Promise<Response> {
     throw new HttpError(res.status, `${init?.method ?? "GET"} ${url} -> ${res.status}: ${body.slice(0, 500)}`);
   }
   return res;
-}
-
-/** Retry on network errors, 429 and 5xx; fail fast on other 4xx (bad request won't fix itself). */
-function isRetryable(err: unknown): boolean {
-  if (err instanceof HttpError) return err.status === 429 || err.status >= 500;
-  return true;
 }
 
 async function apiJson<T>(pathname: string, init?: RequestInit): Promise<T> {

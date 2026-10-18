@@ -2,10 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { LastUpdated } from "@/components/last-updated";
+import { MatchBadge } from "@/components/match-badge";
 import { SourceLink } from "@/components/source-link";
 import { formatDate, formatMonth, formatUsd, formatUsdCompact, recipientTypeLabel } from "@/lib/format";
 import { dataWindow } from "@/lib/gating/dataCutoff";
 import { getViewer } from "@/lib/gating/viewer";
+import { matchDisplay } from "@/lib/mapping/display";
 import { getLargestRecentAwards, getRecipient, getRecipientMonthly } from "@/lib/recipients";
 
 export default function RecipientPage({ params }: PageProps<"/recipient/[id]">) {
@@ -41,6 +43,7 @@ async function RecipientDetail({ params }: { params: PageProps<"/recipient/[id]"
           {recipient.parentName && recipient.parentName !== recipient.name && <> · Parent: {recipient.parentName}</>}
           {recipient.stateCode && <> · {recipient.stateCode}</>}
         </p>
+        <LinkedCompany match={recipient.tickerMatch} />
         <LastUpdated viewer={viewer} />
       </div>
 
@@ -117,5 +120,20 @@ async function RecipientDetail({ params }: { params: PageProps<"/recipient/[id]"
         )}
       </section>
     </div>
+  );
+}
+
+type RecipientWithMatch = NonNullable<Awaited<ReturnType<typeof getRecipient>>>;
+
+function LinkedCompany({ match }: { match: RecipientWithMatch["tickerMatch"] }) {
+  const display = matchDisplay(match);
+  if (!match?.company || display === "hidden") return null;
+  return (
+    <p className="flex flex-wrap items-center gap-2 text-sm">
+      <span className="text-muted">Linked public company:</span>
+      <MatchBadge match={match} ticker={match.company.ticker} />
+      <span>{match.company.name}</span>
+      {match.method === "UEI_PARENT_ROLLUP" && <span className="text-xs text-muted">(via parent company)</span>}
+    </p>
   );
 }

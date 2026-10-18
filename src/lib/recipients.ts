@@ -21,7 +21,10 @@ export interface RecentAward {
 }
 
 export async function getRecipient(id: string) {
-  return prisma.recipient.findUnique({ where: { id } });
+  return prisma.recipient.findUnique({
+    where: { id },
+    include: { tickerMatch: { include: { company: { select: { ticker: true, name: true } } } } },
+  });
 }
 
 export async function getRecipientMonthly(id: string, win: DataWindow): Promise<MonthlyTotal[]> {

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { LastUpdated } from "@/components/last-updated";
+import { MatchBadge } from "@/components/match-badge";
 import { SearchForm } from "@/components/search-form";
 import { formatUsdCompact, recipientTypeLabel } from "@/lib/format";
 import { dataWindow } from "@/lib/gating/dataCutoff";
@@ -41,8 +42,17 @@ async function Results({ searchParams }: { searchParams: PageProps<"/search">["s
               <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted">Public companies</h2>
               <ul className="divide-y divide-line rounded-md border border-line bg-surface">
                 {results.companies.map((c) => (
-                  <li key={c.cik} className="px-4 py-2 text-sm">
-                    <span className="font-mono font-semibold">{c.ticker}</span> · {c.name}
+                  <li key={c.cik} className="flex items-center justify-between gap-3 px-4 py-2 text-sm">
+                    <span>
+                      <span className="font-mono font-semibold">{c.ticker}</span> · {c.name}
+                      {c.exchange && <span className="text-xs text-muted"> · {c.exchange}</span>}
+                    </span>
+                    <span className="tabular text-right">
+                      {formatUsdCompact(c.total)}
+                      <span className="block text-xs text-muted">
+                        {historyYears ? `last ${historyYears} years` : "all time"}, confirmed links
+                      </span>
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -71,9 +81,15 @@ async function Results({ searchParams }: { searchParams: PageProps<"/search">["s
                     {results.recipients.map((r) => (
                       <tr key={r.id}>
                         <td className="px-4 py-2">
-                          <Link href={`/recipient/${encodeURIComponent(r.id)}`} className="font-medium hover:underline">
-                            {r.name}
-                          </Link>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Link href={`/recipient/${encodeURIComponent(r.id)}`} className="font-medium hover:underline">
+                              {r.name}
+                            </Link>
+                            <MatchBadge
+                              ticker={r.ticker}
+                              match={r.matchStatus ? { status: r.matchStatus, confidence: r.matchConfidence ?? 0, companyCik: r.matchCik } : null}
+                            />
+                          </div>
                           {r.parentName && r.parentName !== r.name && (
                             <div className="text-xs text-muted">Parent: {r.parentName}</div>
                           )}
@@ -91,7 +107,8 @@ async function Results({ searchParams }: { searchParams: PageProps<"/search">["s
             )}
             <p className="mt-2 text-xs text-muted">
               Amounts are net obligations (new awards plus modifications, minus de-obligations) by action date.
-              Ticker links for recipients arrive with company matching.
+              Ticker labels link government recipients (legal entities) to public companies; &ldquo;possible match&rdquo;
+              labels are unverified.
             </p>
           </section>
 

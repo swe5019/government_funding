@@ -1,8 +1,12 @@
 import "dotenv/config";
 import { parseArgs } from "node:util";
 import { syncAgencies } from "@/jobs/agencies";
+import { edgarCompanies } from "@/jobs/edgar-companies";
+import { matchTickers } from "@/jobs/match-tickers";
 import { rollupRecipients } from "@/jobs/rollup";
+import { rollupCompanies } from "@/jobs/rollup-companies";
 import { closeJobPool, withJobLock } from "@/jobs/runner";
+import { samParents } from "@/jobs/sam-parents";
 import { USASPENDING_LOCK, usaspendingBackfill, usaspendingDaily, usaspendingLoadLocal } from "@/jobs/usaspending";
 import type { FileKind } from "@/lib/sources/usaspending/rows";
 
@@ -22,6 +26,13 @@ Jobs:
   usaspending-agencies   Refresh agency names and abbreviations
   rollup                 Rebuild recipient aggregates (incremental)
       --full               rebuild everything
+  edgar-companies        Load SEC registrants/tickers, then former names + SIC (needs SEC_USER_AGENT)
+      --file <path>        read company_tickers_exchange.json from disk (skips per-company lookups)
+      --limit <n>          max companies to enrich this run
+  sam-parents            Fill ultimate parents from SAM.gov for top recipients (needs SAM_API_KEY)
+  match-tickers          Match recipients to public companies, then roll up company totals
+      --full               re-match every eligible recipient
+  rollup-companies       Rebuild company totals from current matches
 `;
 
 async function main() {
@@ -35,6 +46,7 @@ async function main() {
       limit: { type: "string" },
       incremental: { type: "boolean" },
       full: { type: "boolean" },
+      file: { type: "string" },
       help: { type: "boolean" },
     },
   });
@@ -65,6 +77,7 @@ async function main() {
       await syncAgencies();
       await withJobLock(USASPENDING_LOCK, () => usaspendingDaily({ limit }));
       await withJobLock("rollup", () => rollupRecipients());
+      await withJobLock("mapping", () => matchAndRollup(false));
       break;
     case "usaspending-file":
       if (!arg) throw new Error("usaspending-file needs a path");
@@ -77,10 +90,29 @@ async function main() {
     case "rollup":
       await withJobLock("rollup", () => rollupRecipients({ full: values.full }));
       break;
+    case "edgar-companies":
+      await withJobLock("edgar", () => edgarCompanies({ file: values.file, limit }));
+      break;
+    case "sam-parents":
+      await withJobLock("sam", () => samParents({ limit }));
+      break;
+    case "match-tickers":
+      await withJobLock("mapping", () => matchAndRollup(values.full ?? false));
+      break;
+    case "rollup-companies":
+      await withJobLock("mapping", () => rollupCompanies());
+      break;
     default:
       console.error(`unknown job "${job}"\n\n${USAGE}`);
       process.exitCode = 2;
   }
+}
+
+async function matchAndRollup(full: boolean) {
+  await matchTickers({ full });
+  // Admin decisions can move recipients between companies at any time; a full company
+  // rollup after matching keeps every company's totals consistent.
+  await rollupCompanies();
 }
 
 main()

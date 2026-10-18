@@ -1,0 +1,14 @@
+{"fields":["cik","name","ticker","exchange"],"data":[
+[1652044,"Alphabet Inc.","GOOGL","Nasdaq"],
+[1652044,"Alphabet Inc.","GOOG","Nasdaq"],
+[936468,"LOCKHEED MARTIN CORP","LMT","NYSE"],
+[723125,"MICRON TECHNOLOGY INC","MU","Nasdaq"],
+[12927,"BOEING CO","BA","NYSE"],
+[40533,"GENERAL DYNAMICS CORP","GD","NYSE"],
+[101829,"RTX Corp","RTX","NYSE"],
+[27419,"TARGET CORP","TGT","NYSE"],
+[9990001,"Acme Space Systems Inc","ACMS","OTC"],
+[9990002,"Example Labs Holdings Inc","EXLB","Nasdaq"],
+[9990003,"Example Labs Group Inc","EXLG","NYSE"],
+[null,"Broken Row Inc","BRKN","NYSE"]
+]}

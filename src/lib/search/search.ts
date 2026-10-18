@@ -12,6 +12,10 @@ export interface RecipientHit {
   parentName: string | null;
   last12m: string;
   total: string;
+  ticker: string | null;
+  matchStatus: string | null;
+  matchConfidence: number | null;
+  matchCik: string | null;
 }
 
 export interface AgencyHit {
@@ -23,7 +27,11 @@ export interface AgencyHit {
 export interface CompanyHit {
   cik: string;
   ticker: string;
+  tickers: string[];
   name: string;
+  exchange: string | null;
+  /** Confirmed-match obligations within the viewer's data window. */
+  total: string;
 }
 
 export interface SearchResults {
@@ -62,12 +70,15 @@ export async function search(rawQuery: string, win: DataWindow, now: Date = new 
       SELECT r.id, r.name, r.uei, r."recipientType", r."stateCode", r."countryCode", r."parentName",
              COALESCE(SUM(m.obligated) FILTER (WHERE m.month >= ${since12m}::date), 0)::text AS "last12m",
              COALESCE(SUM(m.obligated), 0)::text AS total,
-             MAX(c.sim) AS sim
+             MAX(c.sim) AS sim,
+             co.ticker, tm.status::text AS "matchStatus", tm.confidence AS "matchConfidence", tm."companyCik" AS "matchCik"
       FROM candidates c
       JOIN "Recipient" r ON r.id = c.id
       LEFT JOIN "RecipientAwardMonthly" m
         ON m."recipientId" = r.id AND m.view = ${win.view}::"DataView" AND m.month >= ${historyStart}::date
-      GROUP BY r.id
+      LEFT JOIN "TickerMatch" tm ON tm."recipientId" = r.id
+      LEFT JOIN "Company" co ON co.cik = tm."companyCik"
+      GROUP BY r.id, co.ticker, tm.status, tm.confidence, tm."companyCik"
       ORDER BY (r."normalizedName" = ${q}) DESC,
                (r."normalizedName" LIKE ${q + "%"}) DESC,
                SUM(m.obligated) DESC NULLS LAST,
@@ -79,9 +90,14 @@ export async function search(rawQuery: string, win: DataWindow, now: Date = new 
       ORDER BY similarity(name, ${query}) DESC
       LIMIT 10`,
     prisma.$queryRaw<CompanyHit[]>`
-      SELECT cik, ticker, name FROM "Company"
-      WHERE ticker = ${query.toUpperCase()} OR name % ${query} OR name ILIKE ${"%" + query + "%"}
-      ORDER BY (ticker = ${query.toUpperCase()}) DESC, similarity(name, ${query}) DESC
+      SELECT c.cik, c.ticker, c.tickers, c.name, c.exchange,
+             COALESCE((SELECT SUM(m.obligated) FROM "CompanyAwardMonthly" m
+                       WHERE m."companyCik" = c.cik AND m.view = ${win.view}::"DataView" AND m.month >= ${historyStart}::date
+                         AND m."agencyCode" = 'ALL' AND m.category = 'ALL' AND NOT m."includesPossible"), 0)::text AS total
+      FROM "Company" c
+      WHERE c.ticker NOT LIKE 'X:%'
+        AND (${query.toUpperCase()} = ANY(c.tickers) OR c."normalizedName" % ${q} OR c."normalizedName" LIKE ${like})
+      ORDER BY (${query.toUpperCase()} = ANY(c.tickers)) DESC, c."isMajorExchange" DESC, similarity(c."normalizedName", ${q}) DESC
       LIMIT 10`,
   ]);
 

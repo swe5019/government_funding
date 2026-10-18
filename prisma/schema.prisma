@@ -33,6 +33,8 @@ model Agency {
 
   awardsAwarding Award[] @relation("AwardingAgency")
   awardsFunding  Award[] @relation("FundingAgency")
+
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "Agency_name_trgm_idx")
 }
 
 model SubAgency {
@@ -75,25 +77,33 @@ model Recipient {
   awards      Award[]
   tickerMatch TickerMatch?
   monthly     RecipientAwardMonthly[]
-  // Trigram index on normalizedName is created in a raw SQL migration.
 
   @@index([parentUei])
   @@index([ultimateParentUei])
   @@index([recipientType])
+  @@index([normalizedName(ops: raw("gin_trgm_ops"))], type: Gin, map: "Recipient_normalizedName_trgm_idx")
 }
 
 /// A public company registered with the SEC.
 model Company {
-  cik           String    @id
-  ticker        String    @unique
-  name          String
-  exchange      String?
-  sicCode       String?
-  sector        String?
-  marketCap     Decimal?  @db.Decimal(20, 2)
-  marketCapAsOf DateTime? @db.Date
-  createdAt     DateTime  @default(now()) @db.Timestamptz
-  updatedAt     DateTime  @updatedAt @db.Timestamptz
+  cik             String    @id
+  /// Primary ticker (first listed by SEC)
+  ticker          String    @unique
+  /// All tickers for this CIK, primary first (share classes, preferreds)
+  tickers         String[]
+  name            String
+  /// See src/lib/mapping/normalize.ts; trigram-indexed for matching
+  normalizedName  String    @default("")
+  exchange        String?
+  /// NYSE / Nasdaq / NYSE American / Cboe. Only these are auto-matched.
+  isMajorExchange Boolean   @default(false)
+  secLastSyncedAt DateTime? @db.Timestamptz
+  sicCode         String?
+  sector          String?
+  marketCap       Decimal?  @db.Decimal(20, 2)
+  marketCapAsOf   DateTime? @db.Date
+  createdAt       DateTime  @default(now()) @db.Timestamptz
+  updatedAt       DateTime  @updatedAt @db.Timestamptz
 
   aliases    CompanyAlias[]
   matches    TickerMatch[]
@@ -101,6 +111,9 @@ model Company {
   prices     PriceBar[]
   filings    SecFiling[]
   watchItems WatchlistItem[]
+
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "Company_name_trgm_idx")
+  @@index([normalizedName(ops: raw("gin_trgm_ops"))], type: Gin, map: "Company_normalizedName_trgm_idx")
 }
 
 /// Former names, DBAs and known subsidiaries (e.g. from EDGAR Exhibit 21).
@@ -115,6 +128,7 @@ model CompanyAlias {
 
   @@unique([companyCik, normalized])
   @@index([normalized])
+  @@index([normalized(ops: raw("gin_trgm_ops"))], type: Gin, map: "CompanyAlias_normalized_trgm_idx")
 }
 
 enum MatchStatus {
@@ -134,19 +148,23 @@ enum MatchMethod {
 
 /// Recipient -> public company. One row per recipient; subsidiaries inherit via roll-up.
 model TickerMatch {
-  recipientId  String      @id
-  companyCik   String?
+  recipientId       String      @id
+  companyCik        String?
   /// 0..1. Below MATCH_CONFIDENCE_THRESHOLD (src/config/mapping.ts) = "possible match"
-  confidence   Float
-  method       MatchMethod
-  status       MatchStatus @default(PENDING)
+  confidence        Float
+  method            MatchMethod
+  status            MatchStatus @default(PENDING)
+  /// Recipient the decision was made at (the roll-up root). Equals recipientId for roots.
+  parentRecipientId String?
+  /// REALTIME net obligations of the recipient, for ordering the review queue
+  obligationAtStake Decimal?    @db.Decimal(20, 2)
   /// Candidate list, scores, parent chain — shown on the admin review screen
-  evidence     Json
-  reviewedById String?
-  reviewedAt   DateTime?   @db.Timestamptz
-  notes        String?
-  createdAt    DateTime    @default(now()) @db.Timestamptz
-  updatedAt    DateTime    @updatedAt @db.Timestamptz
+  evidence          Json
+  reviewedById      String?
+  reviewedAt        DateTime?   @db.Timestamptz
+  notes             String?
+  createdAt         DateTime    @default(now()) @db.Timestamptz
+  updatedAt         DateTime    @updatedAt @db.Timestamptz
 
   recipient  Recipient @relation(fields: [recipientId], references: [id], onDelete: Cascade)
   company    Company?  @relation(fields: [companyCik], references: [cik])
@@ -154,6 +172,7 @@ model TickerMatch {
 
   @@index([companyCik, status])
   @@index([status, confidence])
+  @@index([parentRecipientId])
 }
 
 // ---------------------------------------------------------------------------
