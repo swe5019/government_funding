@@ -90,7 +90,8 @@ async function findCandidates(client: PoolClient, names: string[]): Promise<Map<
           WHERE "isMajorExchange" AND ("normalizedName" % q.name OR (q.name LIKE "normalizedName" || ' %' AND "normalizedName" LIKE '% %'))
           ORDER BY similarity("normalizedName", q.name) DESC LIMIT 5)
          UNION ALL
-         (SELECT co.cik, co.ticker, co.name, a.normalized, 'FORMER_NAME' FROM "CompanyAlias" a
+         (SELECT co.cik, co.ticker, co.name, a.normalized,
+                 CASE a.source WHEN 'EX21_SUBSIDIARY' THEN 'SUBSIDIARY' ELSE 'FORMER_NAME' END FROM "CompanyAlias" a
           JOIN "Company" co ON co.cik = a."companyCik"
           WHERE co."isMajorExchange" AND (a.normalized % q.name OR (q.name LIKE a.normalized || ' %' AND a.normalized LIKE '% %'))
           ORDER BY similarity(a.normalized, q.name) DESC LIMIT 5)
@@ -112,11 +113,13 @@ export async function matchTickers(opts: { full?: boolean; log?: Logger } = {}) 
   const db = jobPool();
   const { rows: runs } = await db.query<{ job: string; at: Date }>(
     `SELECT job, MAX("startedAt") AS at FROM "IngestionRun"
-     WHERE job IN ('match_tickers', 'edgar_companies', 'edgar_submissions') AND status = 'SUCCEEDED' GROUP BY job`,
+     WHERE job IN ('match_tickers', 'edgar_companies', 'edgar_submissions', 'edgar_subsidiaries') AND status = 'SUCCEEDED' GROUP BY job`,
   );
   const last = (job: string) => runs.find((r) => r.job === job)?.at ?? null;
   const lastMatch = last("match_tickers");
-  const companiesChanged = [last("edgar_companies"), last("edgar_submissions")].some((d) => d && (!lastMatch || d > lastMatch));
+  const companiesChanged = [last("edgar_companies"), last("edgar_submissions"), last("edgar_subsidiaries")].some(
+    (d) => d && (!lastMatch || d > lastMatch),
+  );
   const since = opts.full || companiesChanged ? null : lastMatch;
 
   let touchedCiks: string[] = [];

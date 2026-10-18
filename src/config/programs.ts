@@ -16,12 +16,21 @@ export interface ProgramRules {
   keywords?: string[];
 }
 
+/** Federal Register search for rules and notices about the program. */
+export interface FederalRegisterQuery {
+  /** Full-text search terms (quoted phrases allowed); one API query per term. */
+  terms: string[];
+  /** Agency slugs as used by federalregister.gov (e.g. "national-institute-of-standards-and-technology"). */
+  agencies?: string[];
+}
+
 export interface ProgramConfig {
   slug: string;
   name: string;
   description: string;
   sourceUrl: string;
   rules: ProgramRules;
+  federalRegister?: FederalRegisterQuery;
 }
 
 export const programs: ProgramConfig[] = [
@@ -32,5 +41,6 @@ export const programs: ProgramConfig[] = [
       "Federal financial assistance under the CHIPS and Science Act's CHIPS Incentives Program (Assistance Listing 11.037), run by the CHIPS Program Office at NIST, for building and expanding U.S. semiconductor fabrication, materials and equipment facilities.",
     sourceUrl: "https://www.nist.gov/chips",
     rules: { assistanceListings: ["11.037"] },
+    federalRegister: { terms: ['"CHIPS Incentives Program"'], agencies: ["national-institute-of-standards-and-technology"] },
   },
 ];

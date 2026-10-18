@@ -5,7 +5,8 @@ import { mappingConfig } from "@/config/mapping";
  * the matching job supplies candidates found with pg_trgm. See docs/MAPPING.md.
  */
 
-export type CandidateSource = "NAME" | "FORMER_NAME";
+/** NAME = company's SEC name; FORMER_NAME = an earlier SEC name; SUBSIDIARY = listed in its Exhibit 21. */
+export type CandidateSource = "NAME" | "FORMER_NAME" | "SUBSIDIARY";
 export type ScoreMethod = "EXACT_NAME" | "ALIAS" | "FUZZY";
 
 export interface Candidate {
@@ -65,6 +66,7 @@ const FUZZY_CAP = 0.84;
 const NEAR_IDENTICAL_CAP = 0.9;
 const AMBIGUITY_GAP = 0.05;
 const AMBIGUITY_PENALTY = 0.15;
+const EXACT_SCORE: Record<CandidateSource, number> = { NAME: 0.97, FORMER_NAME: 0.92, SUBSIDIARY: 0.9 };
 const DISTINGUISHING_PENALTY = 0.2;
 
 const tokens = (s: string) => new Set(s.split(" ").filter(Boolean));
@@ -87,8 +89,14 @@ export function scoreCandidate(recipientName: string, c: Candidate): ScoredCandi
 
   if (recipientName === c.matchedName) {
     method = c.source === "NAME" ? "EXACT_NAME" : "ALIAS";
-    score = c.source === "NAME" ? 0.97 : 0.92;
-    reasons.push(c.source === "NAME" ? "exact normalized name" : "exact match on a former SEC name");
+    score = EXACT_SCORE[c.source];
+    reasons.push(
+      c.source === "NAME"
+        ? "exact normalized name"
+        : c.source === "FORMER_NAME"
+          ? "exact match on a former SEC name"
+          : "exact match on a subsidiary listed in the company's 10-K (Exhibit 21)",
+    );
   } else {
     method = "FUZZY";
     const jac = jaccard(rTokens, cTokens);
@@ -108,6 +116,10 @@ export function scoreCandidate(recipientName: string, c: Candidate): ScoredCandi
     if (c.source === "FORMER_NAME") {
       score -= 0.03;
       reasons.push("via former SEC name");
+    }
+    if (c.source === "SUBSIDIARY") {
+      score -= 0.05;
+      reasons.push("via a listed subsidiary");
     }
   }
 

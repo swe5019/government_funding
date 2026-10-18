@@ -356,40 +356,79 @@ model SecFiling {
   companyCik    String
   form          String
   filedAt       DateTime @db.Date
+  /// 8-K item numbers, e.g. "1.01,8.01"
+  items         String?
   title         String?
   url           String
+  /// Keyword screen found government-contract language (see src/lib/sources/edgar/filings.ts)
   mentionsAward Boolean  @default(false)
+  /// Matched phrases, for display ("Department of Defense", "contract award")
+  matchedTerms  String[]
   company       Company  @relation(fields: [companyCik], references: [cik], onDelete: Cascade)
 
   @@index([companyCik, filedAt])
 }
 
+/// Federal Register documents tagged to a program (one row per document per program).
 model FederalRegisterDoc {
-  documentNumber String   @id
+  documentNumber String
+  programSlug    String
   title          String
   type           String
+  abstract       String?
   agencyNames    String[]
   publishedAt    DateTime @db.Date
   url            String
-  programSlug    String?
-  program        Program? @relation(fields: [programSlug], references: [slug])
+  program        Program  @relation(fields: [programSlug], references: [slug], onDelete: Cascade)
 
-  @@index([publishedAt])
+  @@id([documentNumber, programSlug])
+  @@index([programSlug, publishedAt])
 }
 
+/// One contract paragraph from a defense.gov daily contracts announcement.
 model DodAnnouncement {
   /// sha256 of the normalized announcement paragraph
-  id               String   @id
-  announcementDate DateTime @db.Date
-  text             String
-  contractorName   String
-  amount           Decimal? @db.Decimal(20, 2)
-  contractNumber   String?
-  recipientId      String?
-  url              String
+  id                  String   @id
+  announcementDate    DateTime @db.Date
+  /// Branch heading the paragraph appeared under (ARMY, NAVY, AIR FORCE...)
+  branch              String?
+  text                String
+  contractorName      String
+  normalizedName      String   @default("")
+  amount              Decimal? @db.Decimal(20, 2)
+  contractNumber      String?
+  contractingActivity String?
+  /// Resolved by contract number or exact name; company via the recipient's ticker match
+  recipientId         String?
+  url                 String
+  createdAt           DateTime @default(now()) @db.Timestamptz
 
   @@index([announcementDate])
   @@index([contractNumber])
+  @@index([recipientId])
+}
+
+/// SAM.gov contract award notices (published when a contract is awarded, often before USAspending).
+model SamAwardNotice {
+  noticeId           String    @id
+  title              String
+  solicitationNumber String?
+  postedDate         DateTime  @db.Date
+  awardDate          DateTime? @db.Date
+  awardNumber        String?
+  amount             Decimal?  @db.Decimal(20, 2)
+  awardeeName        String?
+  awardeeUei         String?
+  recipientId        String?
+  department         String?
+  office             String?
+  naicsCode          String?
+  url                String
+  createdAt          DateTime  @default(now()) @db.Timestamptz
+
+  @@index([postedDate])
+  @@index([awardeeUei])
+  @@index([recipientId])
 }
 
 // ---------------------------------------------------------------------------

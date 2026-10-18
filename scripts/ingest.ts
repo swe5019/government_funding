@@ -2,12 +2,16 @@ import "dotenv/config";
 import { parseArgs } from "node:util";
 import { sendAlerts } from "@/jobs/alerts";
 import { syncAgencies } from "@/jobs/agencies";
+import { dodAnnouncements } from "@/jobs/dod-announcements";
+import { edgarFilings } from "@/jobs/edgar-filings";
+import { federalRegister } from "@/jobs/federal-register";
 import { edgarCompanies } from "@/jobs/edgar-companies";
 import { matchTickers } from "@/jobs/match-tickers";
 import { syncPrices } from "@/jobs/prices";
 import { rollupRecipients } from "@/jobs/rollup";
 import { rollupCompanies } from "@/jobs/rollup-companies";
 import { closeJobPool, withJobLock } from "@/jobs/runner";
+import { samOpportunities } from "@/jobs/sam-opportunities";
 import { samParents } from "@/jobs/sam-parents";
 import { tagPrograms } from "@/jobs/tag-programs";
 import { USASPENDING_LOCK, usaspendingBackfill, usaspendingDaily, usaspendingLoadLocal } from "@/jobs/usaspending";
@@ -39,6 +43,12 @@ Jobs:
   tag-programs           Sync programs from src/config/programs.ts and re-tag their awards
   prices                 Fetch daily stock bars for linked companies (needs MARKET_DATA_PROVIDER)
   alerts                 Email watchlist alerts for newly published awards (Pro)
+  dod-announcements      defense.gov daily contract announcements (RSS)
+      --file <path>        parse a saved announcement page instead (with --date YYYY-MM-DD)
+  sam-opportunities      SAM.gov contract award notices, last 7 days (needs SAM_API_KEY)
+  federal-register       Federal Register rules/notices for configured programs
+  edgar-filings          8-Ks (screened for contract language) and 10-K Exhibit 21 subsidiaries
+      --limit <n>          max companies this run
 `;
 
 async function main() {
@@ -53,6 +63,7 @@ async function main() {
       incremental: { type: "boolean" },
       full: { type: "boolean" },
       file: { type: "string" },
+      date: { type: "string" },
       help: { type: "boolean" },
     },
   });
@@ -87,6 +98,11 @@ async function main() {
       await withJobLock("programs", () => tagPrograms());
       await withJobLock("mapping", () => matchAndRollup(false));
       await withJobLock("prices", () => syncPrices());
+      // Secondary sources: a failure in one is logged and doesn't stop the others or alerts.
+      await soft("dod-announcements", () => withJobLock("dod", () => dodAnnouncements()));
+      await soft("sam-opportunities", () => withJobLock("sam", () => samOpportunities()));
+      await soft("federal-register", () => withJobLock("fedreg", () => federalRegister()));
+      await soft("edgar-filings", () => withJobLock("edgar", () => edgarFilings()));
       await withJobLock("alerts", () => sendAlerts());
       break;
     case "usaspending-file":
@@ -121,9 +137,33 @@ async function main() {
     case "alerts":
       await withJobLock("alerts", () => sendAlerts());
       break;
+    case "dod-announcements":
+      await withJobLock("dod", () => dodAnnouncements({ file: values.file, date: values.date }));
+      break;
+    case "sam-opportunities":
+      await withJobLock("sam", () => samOpportunities());
+      break;
+    case "federal-register":
+      await withJobLock("fedreg", () => federalRegister());
+      break;
+    case "edgar-filings":
+      await withJobLock("edgar", () => edgarFilings({ limit }));
+      break;
     default:
       console.error(`unknown job "${job}"\n\n${USAGE}`);
       process.exitCode = 2;
+  }
+}
+
+const softFailures: string[] = [];
+
+/** Run a non-critical job; record failure (exit code 1 at the end) but keep going. */
+async function soft(name: string, fn: () => Promise<unknown>) {
+  try {
+    await fn();
+  } catch (err) {
+    softFailures.push(name);
+    console.error(`[${name}] failed:`, err);
   }
 }
 
@@ -135,6 +175,12 @@ async function matchAndRollup(full: boolean) {
 }
 
 main()
+  .then(() => {
+    if (softFailures.length) {
+      console.error(`Completed with failures in: ${softFailures.join(", ")}`);
+      process.exitCode = 1;
+    }
+  })
   .catch((err) => {
     console.error(err);
     process.exitCode = 1;

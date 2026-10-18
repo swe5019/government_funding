@@ -43,3 +43,21 @@ export function createJsonFetcher(opts: { minGapMs: number; headers?: Record<str
     );
   };
 }
+
+/** Like createJsonFetcher, for HTML/XML/text responses. */
+export function createTextFetcher(opts: { minGapMs: number; headers?: Record<string, string>; timeoutMs?: number }) {
+  let last = 0;
+  return async function getText(url: string): Promise<string> {
+    return retry(
+      async () => {
+        const wait = last + opts.minGapMs - Date.now();
+        if (wait > 0) await sleep(wait);
+        last = Date.now();
+        const res = await fetch(url, { headers: opts.headers, signal: AbortSignal.timeout(opts.timeoutMs ?? 60_000) });
+        if (!res.ok) throw new HttpError(res.status, `GET ${url.split("?")[0]} -> ${res.status}`);
+        return res.text();
+      },
+      { attempts: 4, baseDelayMs: 2_000, shouldRetry: isRetryable },
+    );
+  };
+}

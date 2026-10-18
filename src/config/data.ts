@@ -15,4 +15,20 @@ export const dataConfig = {
     /** Minimum gap between API calls (politeness; USAspending publishes no hard limit). */
     minRequestGapMs: 1_000,
   },
+  dod: {
+    /** defense.gov "Contracts" RSS feed (daily announcements of contracts >= $7.5M). */
+    rssUrl: "https://www.defense.gov/DesktopModules/ArticleCS/RSS.ashx?ContentType=400&Site=945&max=10",
+    /** Unlinked announcements are re-checked against new USAspending data for this many days. */
+    relinkDays: 90,
+  },
+  federalRegister: {
+    apiBase: "https://www.federalregister.gov/api/v1",
+    /** Each run re-reads this many days of documents (edits and late indexing). */
+    lookbackDays: 30,
+  },
+  samOpportunities: {
+    apiBase: "https://api.sam.gov/opportunities/v2/search",
+    lookbackDays: 7,
+    pageSize: 1000,
+  },
 } as const;

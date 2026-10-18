@@ -14,8 +14,8 @@ how that relates to their stock. "FedFlow" is a placeholder name, set once in `s
 | 3 | Company and program pages with charts | ✅ built |
 | 4 | Auth, Stripe, tier gating | ✅ built |
 | 5 | Watchlists, alerts, screener, CSV export | ✅ built |
-| 6 | SAM.gov, EDGAR, Federal Register, DoD announcements | next |
-| 7 | Tests, monitoring, SEO, deployment guide | |
+| 6 | SAM.gov, EDGAR, Federal Register, DoD announcements | ✅ built |
+| 7 | Tests, monitoring, SEO, deployment guide | next |
 
 ## Stack
 
@@ -117,6 +117,11 @@ in one file, register it in `getProvider()`, and check the vendor's display/redi
   `getViewer()` (`src/lib/gating/viewer.ts`), which maps the user's Stripe subscription to a plan.
 - Stripe Checkout (card required, 7-day trial for first-time subscribers), Customer Portal for
   changes/cancellation, and a webhook that syncs subscription state. Setup: [docs/BILLING.md](docs/BILLING.md).
+
+## Data sources
+
+See [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md) for every source, what we take from it, refresh cadence,
+rate limits and how each links to companies. `pnpm ingest usaspending-daily` runs the full daily chain.
 
 ## Pro features
 

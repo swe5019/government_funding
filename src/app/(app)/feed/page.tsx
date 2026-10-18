@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { featureConfig } from "@/config/features";
+import { AnnouncementsList } from "@/components/early-signals";
 import { LastUpdated } from "@/components/last-updated";
+import { getAnnouncements } from "@/lib/announcements";
 import { MatchBadge } from "@/components/match-badge";
 import { SourceLink } from "@/components/source-link";
 import { UpgradeNotice } from "@/components/upgrade-notice";
@@ -44,7 +46,11 @@ async function Feed({ searchParams }: { searchParams: PageProps<"/feed">["search
   }
   const minUsd = pick(sp.minUsd, cfg.minUsdOptions, cfg.defaultMinUsd);
   const days = pick(sp.days, cfg.dayOptions, cfg.defaultDays);
-  const items = await getLargeAwardsFeed(dataWindow(viewer.entitlements), { minUsd, days });
+  const win = dataWindow(viewer.entitlements);
+  const [items, announcements] = await Promise.all([
+    getLargeAwardsFeed(win, { minUsd, days }),
+    getAnnouncements(null, { days, minUsd, availableBefore: win.availableBefore, limit: 50 }),
+  ]);
 
   // Group by publication day.
   const groups = new Map<string, typeof items>();
@@ -84,6 +90,13 @@ async function Feed({ searchParams }: { searchParams: PageProps<"/feed">["search
           </a>
         )}
       </form>
+
+      {announcements.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Contract announcements (DoD and SAM.gov)</h2>
+          <AnnouncementsList items={announcements} showCompany />
+        </section>
+      )}
 
       {items.length === 0 && <p className="text-sm text-muted">No awards of {formatUsdCompact(minUsd)}+ published in this period.</p>}
       {[...groups].map(([dayKey, dayItems]) => (

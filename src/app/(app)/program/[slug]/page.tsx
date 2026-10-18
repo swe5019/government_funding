@@ -8,6 +8,7 @@ import { LastUpdated } from "@/components/last-updated";
 import { MatchBadge } from "@/components/match-badge";
 import { SourceLink } from "@/components/source-link";
 import { StatTile } from "@/components/stat-tile";
+import { getProgramDocuments } from "@/lib/announcements";
 import { formatDate, formatMonth, formatUsd, formatUsdCompact } from "@/lib/format";
 import { dataWindow } from "@/lib/gating/dataCutoff";
 import { getViewer } from "@/lib/gating/viewer";
@@ -39,10 +40,11 @@ async function Program({ params }: { params: PageProps<"/program/[slug]">["param
   if (!program) notFound();
   const viewer = await getViewer();
   const win = dataWindow(viewer.entitlements);
-  const [summary, companies, largest] = await Promise.all([
+  const [summary, companies, largest, documents] = await Promise.all([
     getProgramSummary(slug, win),
     getProgramCompanies(slug, win),
     getProgramLargestAwards(slug, win),
+    getProgramDocuments(slug),
   ]);
   const now = new Date();
   const first = summary.monthly[0]?.month ?? win.historyStart ?? now;
@@ -100,6 +102,25 @@ async function Program({ params }: { params: PageProps<"/program/[slug]">["param
             <AwardsOverTime data={series.map((m) => ({ month: m.month.toISOString().slice(0, 7), value: m.obligated }))} />
             <DataTableDetails headers={["Month", "Net obligations"]} rows={series.map((m) => [formatMonth(m.month), formatUsd(m.obligated)])} />
           </div>
+        </section>
+      )}
+
+      {documents.length > 0 && (
+        <section className="space-y-2">
+          <h2 className={h2}>Federal Register rules and notices</h2>
+          <ul className="divide-y divide-line rounded-md border border-line bg-surface text-sm">
+            {documents.map((d) => (
+              <li key={d.documentNumber} className="space-y-0.5 px-4 py-3">
+                <div className="text-xs text-muted">
+                  {formatDate(d.publishedAt)} · {d.type}
+                  {d.agencyNames.length > 0 && <> · {d.agencyNames.join(", ")}</>}
+                </div>
+                <div className="font-medium">{d.title}</div>
+                {d.abstract && <p className="line-clamp-2 text-xs text-muted">{d.abstract}</p>}
+                <SourceLink href={d.url} label="federalregister.gov" />
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 

@@ -1,0 +1,9 @@
+{"cik":"0000936468","name":"LOCKHEED MARTIN CORP","sic":"3760","sicDescription":"Guided Missiles & Space Vehicles & Parts",
+ "formerNames":[{"name":"LOCKHEED MARTIN CORP /MD/","from":"1995-01-01","to":"1995-03-01"}],
+ "filings":{"recent":{
+  "accessionNumber":["0000936468-26-000101","0000936468-26-000090","0000936468-26-000012","0000936468-24-000005"],
+  "filingDate":["2026-10-10","2026-09-01","2026-01-30","2024-03-01"],
+  "form":["8-K","4","10-K","8-K"],
+  "primaryDocument":["lmt-20261010.htm","form4.xml","lmt-20251231.htm","old.htm"],
+  "primaryDocDescription":["8-K","4","10-K","8-K"],
+  "items":["8.01,9.01","","","2.02"]}}}

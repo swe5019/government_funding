@@ -6,6 +6,8 @@ import { AgencyBars } from "@/components/charts/agency-bars";
 import { AwardsOverTime } from "@/components/charts/awards-over-time";
 import { PriceWithAwards } from "@/components/charts/price-with-awards";
 import { DataTableDetails } from "@/components/data-table-details";
+import { EarlySignalsSection } from "@/components/early-signals";
+import { getAnnouncements, getContractFilings } from "@/lib/announcements";
 import { LastUpdated } from "@/components/last-updated";
 import { MatchBadge } from "@/components/match-badge";
 import { SourceLink } from "@/components/source-link";
@@ -61,13 +63,15 @@ async function Company({ params }: { params: PageProps<"/company/[ticker]">["par
 
   const now = new Date();
   const chartFrom = win.historyStart ?? new Date(Date.UTC(now.getUTCFullYear() - 3, now.getUTCMonth(), 1));
-  const [monthly, withPossible, agencies, categories, largest, recipients] = await Promise.all([
+  const [monthly, withPossible, agencies, categories, largest, recipients, announcements, filings] = await Promise.all([
     getCompanyMonthly(company.cik, win),
     getCompanyMonthly(company.cik, win, true),
     getTopAgencies(company.cik, win),
     getCategoryMix(company.cik, win),
     getCompanyLargestAwards(company.cik, win),
     getCompanyRecipients(company.cik, win),
+    getAnnouncements(company.cik, { days: 90, availableBefore: win.availableBefore, limit: 10 }),
+    getContractFilings(company.cik),
   ]);
   const periods = summarizePeriods(monthly, now);
   const series = fillMonths(monthly, chartFrom, now);
@@ -201,6 +205,8 @@ async function Company({ params }: { params: PageProps<"/company/[ticker]">["par
           </div>
         )}
       </section>
+
+      <EarlySignalsSection announcements={announcements} filings={filings} ticker={company.ticker} />
 
       <section className={section}>
         <h2 className={h2}>Government award recipients linked to {company.ticker}</h2>

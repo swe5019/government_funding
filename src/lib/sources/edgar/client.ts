@@ -95,8 +95,28 @@ export interface Submissions {
   sic?: string;
   sicDescription?: string;
   formerNames?: { name: string; from?: string; to?: string }[];
+  filings?: {
+    recent?: {
+      accessionNumber: string[];
+      filingDate: string[];
+      form: string[];
+      primaryDocument: string[];
+      primaryDocDescription?: string[];
+      items?: string[];
+    };
+  };
 }
 
 export async function fetchSubmissions(cik: string): Promise<Submissions> {
   return getJson<Submissions>(`https://data.sec.gov/submissions/CIK${padCik(cik)}.json`);
+}
+
+/** Raw text/HTML from sec.gov (filing indexes and documents), same rate limit and User-Agent. */
+let textFetcher: ((url: string) => Promise<string>) | undefined;
+export async function fetchSecText(url: string): Promise<string> {
+  if (!textFetcher) {
+    const { createTextFetcher } = await import("@/lib/sources/http");
+    textFetcher = createTextFetcher({ minGapMs: 125, headers: { "user-agent": userAgent() } });
+  }
+  return textFetcher(url);
 }
