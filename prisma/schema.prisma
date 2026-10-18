@@ -1,0 +1,538 @@
+// FedFlow database schema.
+//
+// Conventions
+// - Government records use their natural keys as primary keys (agency code, UEI,
+//   USAspending award/transaction unique keys). Ingestion upserts in bulk with
+//   raw SQL `INSERT ... ON CONFLICT`, so natural keys make every job idempotent
+//   without lookups.
+// - Money is Decimal(20,2). Dates from source systems are stored as `@db.Date`;
+//   timestamps we generate are `timestamptz`.
+// - Models for later phases (users, billing, other sources) are defined now so
+//   later phases add columns rather than restructure.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Reference data
+// ---------------------------------------------------------------------------
+
+model Agency {
+  /// USAspending toptier agency code, e.g. "097" (DoD), "080" (NASA)
+  code         String      @id
+  name         String
+  abbreviation String?
+  updatedAt    DateTime    @updatedAt @db.Timestamptz
+  subAgencies  SubAgency[]
+
+  awardsAwarding Award[] @relation("AwardingAgency")
+  awardsFunding  Award[] @relation("FundingAgency")
+}
+
+model SubAgency {
+  /// USAspending subtier agency code, e.g. "5700" (Air Force)
+  code       String   @id
+  name       String
+  agencyCode String
+  agency     Agency   @relation(fields: [agencyCode], references: [code])
+  updatedAt  DateTime @updatedAt @db.Timestamptz
+  awards     Award[]
+
+  @@index([agencyCode])
+}
+
+// ---------------------------------------------------------------------------
+// Recipients and public companies
+// ---------------------------------------------------------------------------
+
+/// A legal entity that receives federal awards.
+model Recipient {
+  /// UEI when present; otherwise "NOUEI:" + hash(normalized name, state, country).
+  id                String    @id
+  uei               String?   @unique
+  duns              String?
+  name              String
+  /// Upper-cased, punctuation and legal suffixes stripped (see src/lib/mapping/normalize.ts)
+  normalizedName    String
+  parentUei         String?
+  parentName        String?
+  /// Filled from SAM.gov entity data (Phase 2/6); drives subsidiary roll-up
+  ultimateParentUei String?
+  /// BUSINESS | NONPROFIT | GOVERNMENT | HIGHER_ED | INDIVIDUAL | OTHER | UNKNOWN
+  recipientType     String    @default("UNKNOWN")
+  stateCode         String?
+  countryCode       String?
+  samLastSyncedAt   DateTime? @db.Timestamptz
+  createdAt         DateTime  @default(now()) @db.Timestamptz
+  updatedAt         DateTime  @updatedAt @db.Timestamptz
+
+  awards      Award[]
+  tickerMatch TickerMatch?
+  monthly     RecipientAwardMonthly[]
+  // Trigram index on normalizedName is created in a raw SQL migration.
+
+  @@index([parentUei])
+  @@index([ultimateParentUei])
+  @@index([recipientType])
+}
+
+/// A public company registered with the SEC.
+model Company {
+  cik           String    @id
+  ticker        String    @unique
+  name          String
+  exchange      String?
+  sicCode       String?
+  sector        String?
+  marketCap     Decimal?  @db.Decimal(20, 2)
+  marketCapAsOf DateTime? @db.Date
+  createdAt     DateTime  @default(now()) @db.Timestamptz
+  updatedAt     DateTime  @updatedAt @db.Timestamptz
+
+  aliases    CompanyAlias[]
+  matches    TickerMatch[]
+  monthly    CompanyAwardMonthly[]
+  prices     PriceBar[]
+  filings    SecFiling[]
+  watchItems WatchlistItem[]
+}
+
+/// Former names, DBAs and known subsidiaries (e.g. from EDGAR Exhibit 21).
+model CompanyAlias {
+  id         String  @id @default(cuid())
+  companyCik String
+  alias      String
+  normalized String
+  /// EDGAR_FORMER_NAME | EX21_SUBSIDIARY | MANUAL
+  source     String
+  company    Company @relation(fields: [companyCik], references: [cik], onDelete: Cascade)
+
+  @@unique([companyCik, normalized])
+  @@index([normalized])
+}
+
+enum MatchStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CORRECTED
+}
+
+enum MatchMethod {
+  UEI_PARENT_ROLLUP
+  EXACT_NAME
+  ALIAS
+  FUZZY
+  MANUAL
+}
+
+/// Recipient -> public company. One row per recipient; subsidiaries inherit via roll-up.
+model TickerMatch {
+  recipientId  String      @id
+  companyCik   String?
+  /// 0..1. Below MATCH_CONFIDENCE_THRESHOLD (src/config/mapping.ts) = "possible match"
+  confidence   Float
+  method       MatchMethod
+  status       MatchStatus @default(PENDING)
+  /// Candidate list, scores, parent chain — shown on the admin review screen
+  evidence     Json
+  reviewedById String?
+  reviewedAt   DateTime?   @db.Timestamptz
+  notes        String?
+  createdAt    DateTime    @default(now()) @db.Timestamptz
+  updatedAt    DateTime    @updatedAt @db.Timestamptz
+
+  recipient  Recipient @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  company    Company?  @relation(fields: [companyCik], references: [cik])
+  reviewedBy User?     @relation(fields: [reviewedById], references: [id])
+
+  @@index([companyCik, status])
+  @@index([status, confidence])
+}
+
+// ---------------------------------------------------------------------------
+// Awards
+// ---------------------------------------------------------------------------
+
+enum DataSource {
+  USASPENDING
+  DOD_ANNOUNCEMENT
+  SAM_OPPORTUNITY
+}
+
+enum AwardCategory {
+  CONTRACT
+  IDV
+  GRANT
+  LOAN
+  DIRECT_PAYMENT
+  INSURANCE
+  OTHER
+}
+
+model Award {
+  /// USAspending generated_unique_award_id, e.g. "CONT_AWD_N0001923C0001_9700_-NONE-_-NONE-"
+  id                 String        @id
+  source             DataSource    @default(USASPENDING)
+  /// PIID for contracts, FAIN/URI for assistance
+  displayId          String?
+  category           AwardCategory
+  /// Raw USAspending award type code (A-D contracts, IDV_*, 02-11 assistance)
+  typeCode           String?
+  description        String?
+  recipientId        String?
+  awardingAgencyCode String?
+  awardingSubCode    String?
+  fundingAgencyCode  String?
+  naicsCode          String?
+  pscCode            String?
+  /// Assistance listing (CFDA) number
+  assistanceListing  String?
+  /// Disaster/emergency fund codes, used for program tagging (e.g. IIJA, IRA)
+  defCodes           String[]
+  totalObligated     Decimal       @db.Decimal(20, 2)
+  potentialValue     Decimal?      @db.Decimal(20, 2)
+  startDate          DateTime?     @db.Date
+  endDate            DateTime?     @db.Date
+  lastModifiedDate   DateTime      @db.Date
+  /// Link to the original government record
+  sourceUrl          String
+  createdAt          DateTime      @default(now()) @db.Timestamptz
+  updatedAt          DateTime      @default(now()) @db.Timestamptz
+
+  recipient      Recipient?         @relation(fields: [recipientId], references: [id])
+  awardingAgency Agency?            @relation("AwardingAgency", fields: [awardingAgencyCode], references: [code])
+  awardingSub    SubAgency?         @relation(fields: [awardingSubCode], references: [code])
+  fundingAgency  Agency?            @relation("FundingAgency", fields: [fundingAgencyCode], references: [code])
+  transactions   AwardTransaction[]
+  programs       AwardProgram[]
+
+  @@index([recipientId])
+  @@index([awardingAgencyCode])
+  @@index([lastModifiedDate])
+  @@index([assistanceListing])
+}
+
+/// One obligation action (base award or modification). Period totals are summed from here.
+model AwardTransaction {
+  /// USAspending contract_transaction_unique_key / assistance_transaction_unique_key
+  id               String   @id
+  awardId          String
+  modNumber        String?
+  actionDate       DateTime @db.Date
+  obligation       Decimal  @db.Decimal(20, 2)
+  actionType       String?
+  description      String?
+  /// When the record became public. Backfill: source last_modified_date.
+  /// Incremental: first time we saw it. Never updated after insert.
+  /// Drives the free-tier delay and alerts.
+  availableAt      DateTime @db.Timestamptz
+  lastModifiedDate DateTime @db.Date
+  updatedAt        DateTime @default(now()) @db.Timestamptz
+
+  award Award @relation(fields: [awardId], references: [id], onDelete: Cascade)
+
+  @@index([awardId, actionDate])
+  @@index([actionDate])
+  @@index([availableAt])
+}
+
+/// A named funding program (CHIPS Act incentives, IRA programs...). Rules tag awards.
+model Program {
+  slug        String               @id
+  name        String
+  description String?
+  /// { assistanceListings?: string[], defCodes?: string[], agencyCodes?: string[], keywords?: string[] }
+  matchRules  Json
+  sourceUrl   String?
+  createdAt   DateTime             @default(now()) @db.Timestamptz
+  updatedAt   DateTime             @updatedAt @db.Timestamptz
+  awards      AwardProgram[]
+  fedRegDocs  FederalRegisterDoc[]
+}
+
+model AwardProgram {
+  awardId     String
+  programSlug String
+  award       Award   @relation(fields: [awardId], references: [id], onDelete: Cascade)
+  program     Program @relation(fields: [programSlug], references: [slug], onDelete: Cascade)
+
+  @@id([awardId, programSlug])
+  @@index([programSlug])
+}
+
+// ---------------------------------------------------------------------------
+// Precomputed aggregates (rebuilt incrementally by the rollup job)
+// ---------------------------------------------------------------------------
+
+/// REALTIME = all data (paid). DELAYED = only rows public for >= FREE_TIER_DELAY_DAYS (free).
+enum DataView {
+  REALTIME
+  DELAYED
+}
+
+model RecipientAwardMonthly {
+  recipientId String
+  view        DataView
+  /// First day of month (by transaction action date)
+  month       DateTime  @db.Date
+  obligated   Decimal   @db.Decimal(20, 2)
+  txCount     Int
+  recipient   Recipient @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@id([recipientId, view, month])
+  @@index([view, month])
+}
+
+model CompanyAwardMonthly {
+  companyCik       String
+  view             DataView
+  month            DateTime @db.Date
+  /// Agency code, or "ALL"
+  agencyCode       String
+  /// AwardCategory, or "ALL"
+  category         String
+  /// false = confirmed matches only; true = includes "possible" (sub-threshold) matches
+  includesPossible Boolean
+  obligated        Decimal  @db.Decimal(20, 2)
+  txCount          Int
+  company          Company  @relation(fields: [companyCik], references: [cik], onDelete: Cascade)
+
+  @@id([companyCik, view, month, agencyCode, category, includesPossible])
+  @@index([view, month])
+}
+
+// ---------------------------------------------------------------------------
+// Market data (provider-agnostic; see src/lib/market-data)
+// ---------------------------------------------------------------------------
+
+model PriceBar {
+  companyCik String
+  date       DateTime @db.Date
+  open       Decimal  @db.Decimal(14, 4)
+  high       Decimal  @db.Decimal(14, 4)
+  low        Decimal  @db.Decimal(14, 4)
+  close      Decimal  @db.Decimal(14, 4)
+  volume     BigInt
+  provider   String
+  company    Company  @relation(fields: [companyCik], references: [cik], onDelete: Cascade)
+
+  @@id([companyCik, date])
+}
+
+// ---------------------------------------------------------------------------
+// Other sources (Phase 6)
+// ---------------------------------------------------------------------------
+
+model SecFiling {
+  accession     String   @id
+  companyCik    String
+  form          String
+  filedAt       DateTime @db.Date
+  title         String?
+  url           String
+  mentionsAward Boolean  @default(false)
+  company       Company  @relation(fields: [companyCik], references: [cik], onDelete: Cascade)
+
+  @@index([companyCik, filedAt])
+}
+
+model FederalRegisterDoc {
+  documentNumber String   @id
+  title          String
+  type           String
+  agencyNames    String[]
+  publishedAt    DateTime @db.Date
+  url            String
+  programSlug    String?
+  program        Program? @relation(fields: [programSlug], references: [slug])
+
+  @@index([publishedAt])
+}
+
+model DodAnnouncement {
+  /// sha256 of the normalized announcement paragraph
+  id               String   @id
+  announcementDate DateTime @db.Date
+  text             String
+  contractorName   String
+  amount           Decimal? @db.Decimal(20, 2)
+  contractNumber   String?
+  recipientId      String?
+  url              String
+
+  @@index([announcementDate])
+  @@index([contractNumber])
+}
+
+// ---------------------------------------------------------------------------
+// Ingestion bookkeeping
+// ---------------------------------------------------------------------------
+
+enum RunStatus {
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+/// One row per attempt of a job chunk. Every run is logged, including failures.
+model IngestionRun {
+  id           String    @id @default(cuid())
+  job          String
+  /// Stable identifier of the unit of work, e.g. "contracts:2024-03". Completed
+  /// chunks are skipped on re-run unless --force.
+  chunkKey     String
+  params       Json
+  status       RunStatus
+  attempt      Int       @default(1)
+  startedAt    DateTime  @default(now()) @db.Timestamptz
+  finishedAt   DateTime? @db.Timestamptz
+  rowsRead     Int       @default(0)
+  rowsUpserted Int       @default(0)
+  rowsSkipped  Int       @default(0)
+  error        String?
+
+  @@index([job, chunkKey, status])
+  @@index([startedAt])
+}
+
+/// Feeds the "last updated" timestamp shown on every data view.
+model DataFreshness {
+  source           String   @id
+  lastSuccessfulAt DateTime @db.Timestamptz
+  /// Latest source modification date included
+  dataThrough      DateTime @db.Date
+}
+
+// ---------------------------------------------------------------------------
+// Users, auth (Auth.js), billing — Phases 4–5
+// ---------------------------------------------------------------------------
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model User {
+  id                   String    @id @default(cuid())
+  email                String    @unique
+  emailVerified        DateTime? @db.Timestamptz
+  name                 String?
+  image                String?
+  role                 Role      @default(USER)
+  acceptedDisclaimerAt DateTime? @db.Timestamptz
+  stripeCustomerId     String?   @unique
+  createdAt            DateTime  @default(now()) @db.Timestamptz
+  updatedAt            DateTime  @updatedAt @db.Timestamptz
+
+  accounts        Account[]
+  sessions        Session[]
+  subscription    Subscription?
+  watchlists      Watchlist[]
+  alerts          AlertDelivery[]
+  reviewedMatches TickerMatch[]
+  auditLogs       AuditLog[]
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime @db.Timestamptz
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime @db.Timestamptz
+
+  @@id([identifier, token])
+}
+
+model Subscription {
+  stripeSubscriptionId String    @id
+  userId               String    @unique
+  /// Key into src/config/plans.ts
+  planKey              String
+  /// month | year
+  interval             String
+  /// Stripe status: trialing, active, past_due, canceled...
+  status               String
+  trialEndsAt          DateTime? @db.Timestamptz
+  currentPeriodEnd     DateTime  @db.Timestamptz
+  cancelAtPeriodEnd    Boolean   @default(false)
+  updatedAt            DateTime  @updatedAt @db.Timestamptz
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Watchlist {
+  id        String          @id @default(cuid())
+  userId    String
+  name      String
+  createdAt DateTime        @default(now()) @db.Timestamptz
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     WatchlistItem[]
+
+  @@index([userId])
+}
+
+model WatchlistItem {
+  watchlistId    String
+  companyCik     String
+  /// Alert when a new award obligation >= this amount (USD); null = no alerts
+  alertThreshold Decimal?  @db.Decimal(20, 2)
+  watchlist      Watchlist @relation(fields: [watchlistId], references: [id], onDelete: Cascade)
+  company        Company   @relation(fields: [companyCik], references: [cik], onDelete: Cascade)
+
+  @@id([watchlistId, companyCik])
+  @@index([companyCik])
+}
+
+/// Unique per (user, transaction) so alert jobs are idempotent.
+model AlertDelivery {
+  id            String   @id @default(cuid())
+  userId        String
+  companyCik    String
+  transactionId String
+  sentAt        DateTime @default(now()) @db.Timestamptz
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, transactionId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  entity    String
+  entityId  String
+  before    Json?
+  after     Json?
+  createdAt DateTime @default(now()) @db.Timestamptz
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([entity, entityId])
+}

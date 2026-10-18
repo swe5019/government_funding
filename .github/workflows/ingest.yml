@@ -1,0 +1,49 @@
+name: Ingest
+
+# Ingestion runs here rather than on Vercel: bulk downloads take minutes to hours.
+# Repository secrets needed: DIRECT_URL (Neon *unpooled* connection string).
+
+on:
+  schedule:
+    # Daily at 09:17 UTC. USAspending typically publishes overnight (US time).
+    - cron: "17 9 * * *"
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "Job"
+        type: choice
+        options: [usaspending-daily, usaspending-backfill, usaspending-agencies, rollup]
+        default: usaspending-daily
+      args:
+        description: "Extra args, e.g. --month 2024-03 --kind contracts, or --full for rollup"
+        required: false
+        default: ""
+
+concurrency:
+  group: ingest
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    # Hosted runners stop at 6h. The backfill is resumable: re-run it and it continues
+    # with the first month not yet loaded.
+    timeout-minutes: 350
+    env:
+      DIRECT_URL: ${{ secrets.DIRECT_URL }}
+      DATABASE_URL: ${{ secrets.DIRECT_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:migrate
+      - name: Run job
+        run: pnpm ingest ${{ github.event.inputs.job || 'usaspending-daily' }} ${{ github.event.inputs.args }}
+      - name: Weekly full rollup (Sundays)
+        if: github.event_name == 'schedule' && github.run_attempt == 1
+        run: |
+          if [ "$(date -u +%u)" = "7" ]; then pnpm ingest rollup --full; fi
