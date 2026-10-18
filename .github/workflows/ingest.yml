@@ -13,7 +13,7 @@ on:
       job:
         description: "Job"
         type: choice
-        options: [usaspending-daily, usaspending-backfill, usaspending-agencies, rollup, edgar-companies, sam-parents, match-tickers, rollup-companies]
+        options: [usaspending-daily, usaspending-backfill, usaspending-agencies, rollup, edgar-companies, sam-parents, match-tickers, rollup-companies, tag-programs, prices]
         default: usaspending-daily
       args:
         description: "Extra args, e.g. --month 2024-03 --kind contracts, or --full for rollup"
@@ -35,6 +35,8 @@ jobs:
       DATABASE_URL: ${{ secrets.DIRECT_URL }}
       SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
       SAM_API_KEY: ${{ secrets.SAM_API_KEY }}
+      MARKET_DATA_PROVIDER: ${{ vars.MARKET_DATA_PROVIDER }}
+      MARKET_DATA_API_KEY: ${{ secrets.MARKET_DATA_API_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

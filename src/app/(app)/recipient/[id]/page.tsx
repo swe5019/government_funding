@@ -131,8 +131,10 @@ function LinkedCompany({ match }: { match: RecipientWithMatch["tickerMatch"] }) 
   return (
     <p className="flex flex-wrap items-center gap-2 text-sm">
       <span className="text-muted">Linked public company:</span>
-      <MatchBadge match={match} ticker={match.company.ticker} />
-      <span>{match.company.name}</span>
+      <MatchBadge link match={match} ticker={match.company.ticker} />
+      <Link href={`/company/${encodeURIComponent(match.company.ticker)}`} className="hover:underline">
+        {match.company.name}
+      </Link>
       {match.method === "UEI_PARENT_ROLLUP" && <span className="text-xs text-muted">(via parent company)</span>}
     </p>
   );

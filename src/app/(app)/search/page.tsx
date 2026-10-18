@@ -43,10 +43,10 @@ async function Results({ searchParams }: { searchParams: PageProps<"/search">["s
               <ul className="divide-y divide-line rounded-md border border-line bg-surface">
                 {results.companies.map((c) => (
                   <li key={c.cik} className="flex items-center justify-between gap-3 px-4 py-2 text-sm">
-                    <span>
+                    <Link href={`/company/${encodeURIComponent(c.ticker)}`} className="hover:underline">
                       <span className="font-mono font-semibold">{c.ticker}</span> · {c.name}
                       {c.exchange && <span className="text-xs text-muted"> · {c.exchange}</span>}
-                    </span>
+                    </Link>
                     <span className="tabular text-right">
                       {formatUsdCompact(c.total)}
                       <span className="block text-xs text-muted">
@@ -86,6 +86,7 @@ async function Results({ searchParams }: { searchParams: PageProps<"/search">["s
                               {r.name}
                             </Link>
                             <MatchBadge
+                              link
                               ticker={r.ticker}
                               match={r.matchStatus ? { status: r.matchStatus, confidence: r.matchConfidence ?? 0, companyCik: r.matchCik } : null}
                             />

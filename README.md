@@ -11,8 +11,8 @@ how that relates to their stock. "FedFlow" is a placeholder name, set once in `s
 |---|---|---|
 | 1 | Schema, USAspending ingestion (3-year backfill + daily), basic search | ✅ built |
 | 2 | Recipient → ticker mapping + admin review | ✅ built |
-| 3 | Company and program pages with charts | next |
-| 4 | Auth, Stripe, tier gating | |
+| 3 | Company and program pages with charts | ✅ built |
+| 4 | Auth, Stripe, tier gating | next |
 | 5 | Watchlists, alerts, screener, CSV export | |
 | 6 | SAM.gov, EDGAR, Federal Register, DoD announcements | |
 | 7 | Tests, monitoring, SEO, deployment guide | |
@@ -33,7 +33,10 @@ pnpm ingest usaspending-file tests/fixtures/All_Contracts_PrimeTransactions_samp
 pnpm ingest usaspending-file tests/fixtures/All_Assistance_PrimeTransactions_sample_1.csv
 pnpm ingest edgar-companies --file tests/fixtures/company_tickers_exchange.json
 pnpm ingest match-tickers
-ADMIN_USERNAME=admin ADMIN_PASSWORD=dev pnpm dev   # http://localhost:3000/search?q=lockheed, /admin
+pnpm ingest tag-programs
+MARKET_DATA_PROVIDER=mock pnpm ingest prices      # optional: simulated prices for local charts
+ADMIN_USERNAME=admin ADMIN_PASSWORD=dev MARKET_DATA_PROVIDER=mock pnpm dev
+# http://localhost:3000/company/LMT, /program/chips-act, /search?q=lockheed, /admin
 ```
 
 The fixture files contain illustrative records, not real awards.
@@ -85,6 +88,25 @@ Review at `/admin/matches` (HTTP Basic auth via `ADMIN_USERNAME` / `ADMIN_PASSWO
 accounts): approve, reject, correct to any ticker (OTC included), or link unmatched recipients.
 Decisions are audit-logged, apply to a parent's subsidiaries, and are never overwritten by re-matching.
 `/admin/ingestion` shows recent job runs and data freshness.
+
+## Company and program pages
+
+- `/company/[ticker]` (any share-class ticker redirects to the primary one): last-12-month and
+  quarter-to-date totals with year-over-year change, monthly chart, top agencies, award-type mix,
+  largest recent awards with source links, linked recipients, and, when a price provider is
+  configured, the stock price with awards ≥ $10M marked.
+- `/programs`, `/program/[slug]`: program totals, public companies receiving funds (confirmed, then
+  labeled possible matches), monthly chart, largest awards with source links.
+
+**Adding a program**: add an entry to `src/config/programs.ts` (assistance listing numbers,
+disaster/emergency fund codes, or agency-scoped keywords; verify identifiers on SAM.gov Assistance
+Listings first), then run `pnpm ingest tag-programs`. Daily ingestion re-tags automatically.
+
+**Stock prices**: `src/lib/market-data/` defines the provider interface. With `MARKET_DATA_PROVIDER`
+unset, company pages show award charts only. `mock` generates clearly labeled simulated prices for
+development and is ignored in production. To add a licensed vendor, implement `MarketDataProvider`
+in one file, register it in `getProvider()`, and check the vendor's display/redistribution terms;
+`pnpm ingest prices` then backfills 3 years and runs daily after matching.
 
 ## Tests
 

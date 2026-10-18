@@ -12,6 +12,9 @@ export function SiteHeader() {
           <Link href="/search" className="hover:text-fg">
             Search
           </Link>
+          <Link href="/programs" className="hover:text-fg">
+            Programs
+          </Link>
         </nav>
       </div>
     </header>

@@ -236,6 +236,8 @@ model Award {
   @@index([awardingAgencyCode])
   @@index([lastModifiedDate])
   @@index([assistanceListing])
+  @@index([naicsCode])
+  @@index([defCodes], type: Gin)
 }
 
 /// One obligation action (base award or modification). Period totals are summed from here.

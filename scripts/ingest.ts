@@ -3,10 +3,12 @@ import { parseArgs } from "node:util";
 import { syncAgencies } from "@/jobs/agencies";
 import { edgarCompanies } from "@/jobs/edgar-companies";
 import { matchTickers } from "@/jobs/match-tickers";
+import { syncPrices } from "@/jobs/prices";
 import { rollupRecipients } from "@/jobs/rollup";
 import { rollupCompanies } from "@/jobs/rollup-companies";
 import { closeJobPool, withJobLock } from "@/jobs/runner";
 import { samParents } from "@/jobs/sam-parents";
+import { tagPrograms } from "@/jobs/tag-programs";
 import { USASPENDING_LOCK, usaspendingBackfill, usaspendingDaily, usaspendingLoadLocal } from "@/jobs/usaspending";
 import type { FileKind } from "@/lib/sources/usaspending/rows";
 
@@ -33,6 +35,8 @@ Jobs:
   match-tickers          Match recipients to public companies, then roll up company totals
       --full               re-match every eligible recipient
   rollup-companies       Rebuild company totals from current matches
+  tag-programs           Sync programs from src/config/programs.ts and re-tag their awards
+  prices                 Fetch daily stock bars for linked companies (needs MARKET_DATA_PROVIDER)
 `;
 
 async function main() {
@@ -72,12 +76,15 @@ async function main() {
         }),
       );
       await withJobLock("rollup", () => rollupRecipients());
+      await withJobLock("programs", () => tagPrograms());
       break;
     case "usaspending-daily":
       await syncAgencies();
       await withJobLock(USASPENDING_LOCK, () => usaspendingDaily({ limit }));
       await withJobLock("rollup", () => rollupRecipients());
+      await withJobLock("programs", () => tagPrograms());
       await withJobLock("mapping", () => matchAndRollup(false));
+      await withJobLock("prices", () => syncPrices());
       break;
     case "usaspending-file":
       if (!arg) throw new Error("usaspending-file needs a path");
@@ -101,6 +108,12 @@ async function main() {
       break;
     case "rollup-companies":
       await withJobLock("mapping", () => rollupCompanies());
+      break;
+    case "tag-programs":
+      await withJobLock("programs", () => tagPrograms());
+      break;
+    case "prices":
+      await withJobLock("prices", () => syncPrices({ limit }));
       break;
     default:
       console.error(`unknown job "${job}"\n\n${USAGE}`);
