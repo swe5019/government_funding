@@ -17,6 +17,12 @@ export function SiteHeader() {
           <Link href="/programs" className="hover:text-fg">
             Programs
           </Link>
+          <Link href="/feed" className="hover:text-fg">
+            New awards
+          </Link>
+          <Link href="/screener" className="hover:text-fg">
+            Screener
+          </Link>
           <Suspense fallback={<span className="inline-block h-7 w-16" aria-hidden />}>
             <UserMenu />
           </Suspense>

@@ -23,7 +23,9 @@ import {
 } from "@/lib/companies";
 import { formatDate, formatMonth, formatUsd, formatUsdCompact } from "@/lib/format";
 import { dataWindow, type DataWindow } from "@/lib/gating/dataCutoff";
-import { getViewer } from "@/lib/gating/viewer";
+import { getViewer, type Viewer } from "@/lib/gating/viewer";
+import { watchlistsContaining } from "@/lib/watchlists";
+import { watchCompanyAction } from "../../watchlists/actions";
 import { getProvider } from "@/lib/market-data";
 import { fillMonths, summarizePeriods } from "@/lib/periods";
 
@@ -89,6 +91,7 @@ async function Company({ params }: { params: PageProps<"/company/[ticker]">["par
             .join(" · ")}
         </p>
         <LastUpdated viewer={viewer} />
+        <CompanyActions viewer={viewer} cik={company.cik} ticker={company.ticker} />
       </header>
 
       <section className="grid gap-3 sm:grid-cols-3" aria-label="Headline figures">
@@ -279,5 +282,48 @@ async function PriceSection({ cik, ticker, win, from }: { cik: string; ticker: s
         )}
       </div>
     </section>
+  );
+}
+
+/** Watch + CSV export. Pro features show an upgrade path instead of disappearing. */
+async function CompanyActions({ viewer, cik, ticker }: { viewer: Viewer; cik: string; ticker: string }) {
+  const btn = "rounded-md border border-line px-3 py-1.5 text-sm hover:bg-bg";
+  if (!viewer.user) {
+    return (
+      <div className="flex gap-2 pt-2">
+        <Link href={`/signin?callbackUrl=${encodeURIComponent(`/company/${ticker}`)}`} className={btn}>
+          ☆ Watch {ticker}
+        </Link>
+      </div>
+    );
+  }
+  if (!viewer.entitlements.watchlists) {
+    return (
+      <div className="flex gap-2 pt-2">
+        <Link href="/pricing?feature=watchlists" className={btn}>
+          ☆ Watch {ticker} <span className="text-xs text-accent">Pro</span>
+        </Link>
+      </div>
+    );
+  }
+  const watching = (await watchlistsContaining(viewer.user.id, cik)).length > 0;
+  return (
+    <div className="flex flex-wrap gap-2 pt-2">
+      {watching ? (
+        <Link href="/watchlists" className={btn}>
+          ★ Watching · manage alerts
+        </Link>
+      ) : (
+        <form action={watchCompanyAction}>
+          <input type="hidden" name="ticker" value={ticker} />
+          <button className={btn}>☆ Watch {ticker}</button>
+        </form>
+      )}
+      {viewer.entitlements.csvExport && (
+        <a href={`/api/export/company/${encodeURIComponent(ticker)}`} className={btn}>
+          Download awards CSV
+        </a>
+      )}
+    </div>
   );
 }

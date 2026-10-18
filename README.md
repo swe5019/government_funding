@@ -13,8 +13,8 @@ how that relates to their stock. "FedFlow" is a placeholder name, set once in `s
 | 2 | Recipient → ticker mapping + admin review | ✅ built |
 | 3 | Company and program pages with charts | ✅ built |
 | 4 | Auth, Stripe, tier gating | ✅ built |
-| 5 | Watchlists, alerts, screener, CSV export | next |
-| 6 | SAM.gov, EDGAR, Federal Register, DoD announcements | |
+| 5 | Watchlists, alerts, screener, CSV export | ✅ built |
+| 6 | SAM.gov, EDGAR, Federal Register, DoD announcements | next |
 | 7 | Tests, monitoring, SEO, deployment guide | |
 
 ## Stack
@@ -117,6 +117,21 @@ in one file, register it in `getProvider()`, and check the vendor's display/redi
   `getViewer()` (`src/lib/gating/viewer.ts`), which maps the user's Stripe subscription to a plan.
 - Stripe Checkout (card required, 7-day trial for first-time subscribers), Customer Portal for
   changes/cancellation, and a webhook that syncs subscription state. Setup: [docs/BILLING.md](docs/BILLING.md).
+
+## Pro features
+
+Limits and defaults are in `src/config/features.ts`; who gets them is `src/config/plans.ts`.
+
+- **Watchlists** (`/watchlists`, "Watch" on company pages): up to 5 lists × 100 companies, each with
+  an email-alert threshold (default $1M; empty = off).
+- **Alerts** (`pnpm ingest alerts`, run after every daily ingest): one digest email per user listing newly
+  published awards at or above each threshold, confirmed company links only, with source links. Only
+  awards published after the company was added are sent; each award is sent once per user.
+- **New large awards feed** (`/feed`): newly published awards ≥ $1M/$10M/$50M/$100M over 1/7/30 days.
+- **Screener** (`/screener`): filter by last-12-month awards, growth vs the prior 12 months, awarding
+  agency, sector, and award size relative to market cap (once a price provider supplies market caps).
+- **CSV export**: company awards, screener results and the feed (`/api/export/*`), capped at 50,000 rows,
+  with spreadsheet-formula injection neutralized.
 
 ## Tests
 

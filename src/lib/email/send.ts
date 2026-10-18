@@ -5,6 +5,7 @@ export interface EmailMessage {
   subject: string;
   html: string;
   text: string;
+  headers?: Record<string, string>;
 }
 
 let client: Resend | undefined;
@@ -23,7 +24,7 @@ export async function sendEmail(msg: EmailMessage): Promise<void> {
   const from = process.env.EMAIL_FROM;
   if (!from) throw new Error("EMAIL_FROM is not set");
   client ??= new Resend(key);
-  const { error } = await client.emails.send({ from, to: msg.to, subject: msg.subject, html: msg.html, text: msg.text });
+  const { error } = await client.emails.send({ from, to: msg.to, subject: msg.subject, html: msg.html, text: msg.text, headers: msg.headers });
   if (error) throw new Error(`Resend: ${error.message}`);
 }
 

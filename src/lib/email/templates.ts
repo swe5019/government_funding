@@ -28,3 +28,57 @@ export function magicLinkEmail(to: string, url: string): EmailMessage {
     text: `Sign in to ${siteConfig.name}:\n${url}\n\nThe link expires in 15 minutes. If you didn't request it, ignore this email.\n\n${DISCLAIMER}`,
   };
 }
+
+export interface AlertAward {
+  ticker: string;
+  companyName: string;
+  recipientName: string;
+  obligation: number;
+  actionDate: Date;
+  agencyName: string | null;
+  description: string | null;
+  sourceUrl: string;
+}
+
+const usd = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+const day = (d: Date) => d.toISOString().slice(0, 10);
+
+/** Digest of new awards for a user's watched companies. */
+export function alertDigestEmail(to: string, awards: AlertAward[], extra: number): EmailMessage {
+  const manageUrl = `${siteConfig.url}/watchlists`;
+  const tickers = [...new Set(awards.map((a) => a.ticker))];
+  const subject =
+    awards.length === 1
+      ? `${awards[0].ticker}: new ${usd(awards[0].obligation)} federal award`
+      : `New federal awards for ${tickers.slice(0, 3).join(", ")}${tickers.length > 3 ? ` +${tickers.length - 3}` : ""}`;
+  const rows = awards
+    .map(
+      (a) => `<tr><td style="padding:8px 0;border-top:1px solid #e3e6eb">
+<div style="font-weight:600">${escapeHtml(a.ticker)} · ${escapeHtml(usd(a.obligation))}</div>
+<div style="font-size:13px">${escapeHtml(a.description ?? "Award")}</div>
+<div style="font-size:12px;color:#5b6474">${escapeHtml(a.recipientName)} · ${escapeHtml(a.agencyName ?? "")} · ${day(a.actionDate)} ·
+<a href="${escapeHtml(a.sourceUrl)}">Source record</a></div></td></tr>`,
+    )
+    .join("");
+  const more = extra > 0 ? `<p style="font-size:13px">…and ${extra} more. See them on your watchlist.</p>` : "";
+  return {
+    to,
+    subject,
+    html: layout(
+      "New awards for companies you watch",
+      `<table role="presentation" width="100%">${rows}</table>${more}
+<p style="font-size:13px;margin-top:16px"><a href="${escapeHtml(manageUrl)}">Manage watchlists and alert thresholds</a></p>`,
+    ),
+    text: [
+      "New awards for companies you watch:",
+      ...awards.map(
+        (a) => `- ${a.ticker} ${usd(a.obligation)}: ${a.description ?? "Award"} (${a.recipientName}, ${day(a.actionDate)}) ${a.sourceUrl}`,
+      ),
+      extra > 0 ? `...and ${extra} more.` : "",
+      `Manage alerts: ${manageUrl}`,
+      "",
+      DISCLAIMER,
+    ].join("\n"),
+    headers: { "List-Unsubscribe": `<${manageUrl}>` },
+  };
+}

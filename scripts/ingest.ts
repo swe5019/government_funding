@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { parseArgs } from "node:util";
+import { sendAlerts } from "@/jobs/alerts";
 import { syncAgencies } from "@/jobs/agencies";
 import { edgarCompanies } from "@/jobs/edgar-companies";
 import { matchTickers } from "@/jobs/match-tickers";
@@ -37,6 +38,7 @@ Jobs:
   rollup-companies       Rebuild company totals from current matches
   tag-programs           Sync programs from src/config/programs.ts and re-tag their awards
   prices                 Fetch daily stock bars for linked companies (needs MARKET_DATA_PROVIDER)
+  alerts                 Email watchlist alerts for newly published awards (Pro)
 `;
 
 async function main() {
@@ -85,6 +87,7 @@ async function main() {
       await withJobLock("programs", () => tagPrograms());
       await withJobLock("mapping", () => matchAndRollup(false));
       await withJobLock("prices", () => syncPrices());
+      await withJobLock("alerts", () => sendAlerts());
       break;
     case "usaspending-file":
       if (!arg) throw new Error("usaspending-file needs a path");
@@ -114,6 +117,9 @@ async function main() {
       break;
     case "prices":
       await withJobLock("prices", () => syncPrices({ limit }));
+      break;
+    case "alerts":
+      await withJobLock("alerts", () => sendAlerts());
       break;
     default:
       console.error(`unknown job "${job}"\n\n${USAGE}`);

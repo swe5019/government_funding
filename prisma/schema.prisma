@@ -521,6 +521,7 @@ model Watchlist {
   user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   items     WatchlistItem[]
 
+  @@unique([userId, name])
   @@index([userId])
 }
 
@@ -529,6 +530,8 @@ model WatchlistItem {
   companyCik     String
   /// Alert when a new award obligation >= this amount (USD); null = no alerts
   alertThreshold Decimal?  @db.Decimal(20, 2)
+  /// Alerts only cover awards published after the company was added (no backfill flood)
+  createdAt      DateTime  @default(now()) @db.Timestamptz
   watchlist      Watchlist @relation(fields: [watchlistId], references: [id], onDelete: Cascade)
   company        Company   @relation(fields: [companyCik], references: [cik], onDelete: Cascade)
 
@@ -546,6 +549,7 @@ model AlertDelivery {
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, transactionId])
+  @@index([sentAt])
 }
 
 model AuditLog {

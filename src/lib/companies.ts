@@ -188,3 +188,44 @@ export async function getPriceSeries(cik: string, provider: string, since: Date)
   });
   return rows.map((r) => ({ date: r.date.toISOString().slice(0, 10), close: Number(r.close) }));
 }
+
+export interface ExportAwardRow {
+  actionDate: Date;
+  availableAt: Date;
+  obligation: string;
+  awardId: string;
+  displayId: string | null;
+  modNumber: string | null;
+  category: string;
+  description: string | null;
+  recipientName: string;
+  recipientUei: string | null;
+  linkMethod: string;
+  agencyName: string | null;
+  subAgencyName: string | null;
+  sourceUrl: string;
+}
+
+/** Every transaction from confirmed recipients in the viewer's window (CSV export). */
+export async function getCompanyAwardsForExport(cik: string, win: DataWindow, limit: number): Promise<ExportAwardRow[]> {
+  return prisma.$queryRawUnsafe<ExportAwardRow[]>(
+    `SELECT t."actionDate", t."availableAt", t.obligation::text AS obligation, a.id AS "awardId", a."displayId",
+            t."modNumber", a.category::text AS category, COALESCE(t.description, a.description) AS description,
+            r.name AS "recipientName", r.uei AS "recipientUei", tm.method::text AS "linkMethod",
+            ag.name AS "agencyName", sa.name AS "subAgencyName", a."sourceUrl"
+     FROM "TickerMatch" tm
+     JOIN "Recipient" r ON r.id = tm."recipientId"
+     JOIN "Award" a ON a."recipientId" = tm."recipientId"
+     JOIN "AwardTransaction" t ON t."awardId" = a.id
+     LEFT JOIN "Agency" ag ON ag.code = a."awardingAgencyCode"
+     LEFT JOIN "SubAgency" sa ON sa.code = a."awardingSubCode"
+     WHERE tm."companyCik" = $1 AND ${CONFIRMED_SQL}
+       AND t."actionDate" >= $2::date AND t."availableAt" <= $3
+     ORDER BY t."actionDate" DESC, t.id
+     LIMIT $4`,
+    cik,
+    start(win),
+    availableBefore(win),
+    limit,
+  );
+}

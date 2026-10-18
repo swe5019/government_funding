@@ -23,6 +23,11 @@ export async function UserMenu() {
           Admin
         </Link>
       )}
+      {viewer.entitlements.watchlists && (
+        <Link href="/watchlists" className="hover:text-fg">
+          Watchlists
+        </Link>
+      )}
       {viewer.plan === "free" && (
         <Link href="/pricing" className="font-medium text-accent hover:underline">
           Upgrade
