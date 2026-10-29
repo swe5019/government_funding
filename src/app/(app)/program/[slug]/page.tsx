@@ -96,7 +96,7 @@ async function Program({ params }: { params: PageProps<"/program/[slug]">["param
         )}
       </section>
 
-      {series.length > 1 && (
+      {summary.awardCount > 0 && series.length > 1 && (
         <section className="space-y-2">
           <h2 className={h2}>Obligations by month</h2>
           <div className="rounded-md border border-line bg-surface p-4">
@@ -127,52 +127,56 @@ async function Program({ params }: { params: PageProps<"/program/[slug]">["param
 
       <section className="space-y-2">
         <h2 className={h2}>Largest awards</h2>
-        <div className="overflow-x-auto rounded-md border border-line bg-surface">
-          <table className="w-full text-sm">
-            <thead className="border-b border-line text-left text-xs text-muted">
-              <tr>
-                <th className="px-4 py-2 font-medium">Date</th>
-                <th className="px-4 py-2 font-medium">Recipient</th>
-                <th className="px-4 py-2 text-right font-medium">Obligation</th>
-                <th className="hidden px-4 py-2 font-medium sm:table-cell">Source</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {largest.map((a) => (
-                <tr key={a.transactionId}>
-                  <td className="whitespace-nowrap px-4 py-2 text-muted">{formatDate(a.actionDate)}</td>
-                  <td className="px-4 py-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      {a.recipientId ? (
-                        <Link href={`/recipient/${encodeURIComponent(a.recipientId)}`} className="font-medium hover:underline">
-                          {a.recipientName}
-                        </Link>
-                      ) : (
-                        <span>{a.recipientName ?? "—"}</span>
-                      )}
-                      <MatchBadge
-                        link
-                        ticker={a.ticker}
-                        match={a.matchStatus ? { status: a.matchStatus, confidence: a.matchConfidence ?? 0, companyCik: a.matchCik } : null}
-                      />
-                    </div>
-                    <div className="text-xs text-muted">{a.description}</div>
-                    <div className="text-xs sm:hidden">
-                      <SourceLink href={a.sourceUrl} />
-                    </div>
-                  </td>
-                  <td className="tabular whitespace-nowrap px-4 py-2 text-right">
-                    <span className="sm:hidden">{formatUsdCompact(a.obligation)}</span>
-                    <span className="hidden sm:inline">{formatUsd(a.obligation)}</span>
-                  </td>
-                  <td className="hidden px-4 py-2 sm:table-cell">
-                    <SourceLink href={a.sourceUrl} />
-                  </td>
+        {largest.length === 0 ? (
+          <p className="text-sm text-muted">No awards in this program for the period shown yet.</p>
+        ) : (
+          <div className="overflow-x-auto rounded-md border border-line bg-surface">
+            <table className="w-full text-sm">
+              <thead className="border-b border-line text-left text-xs text-muted">
+                <tr>
+                  <th className="px-4 py-2 font-medium">Date</th>
+                  <th className="px-4 py-2 font-medium">Recipient</th>
+                  <th className="px-4 py-2 text-right font-medium">Obligation</th>
+                  <th className="hidden px-4 py-2 font-medium sm:table-cell">Source</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {largest.map((a) => (
+                  <tr key={a.transactionId}>
+                    <td className="whitespace-nowrap px-4 py-2 text-muted">{formatDate(a.actionDate)}</td>
+                    <td className="px-4 py-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {a.recipientId ? (
+                          <Link href={`/recipient/${encodeURIComponent(a.recipientId)}`} className="font-medium hover:underline">
+                            {a.recipientName}
+                          </Link>
+                        ) : (
+                          <span>{a.recipientName ?? "—"}</span>
+                        )}
+                        <MatchBadge
+                          link
+                          ticker={a.ticker}
+                          match={a.matchStatus ? { status: a.matchStatus, confidence: a.matchConfidence ?? 0, companyCik: a.matchCik } : null}
+                        />
+                      </div>
+                      <div className="text-xs text-muted">{a.description}</div>
+                      <div className="text-xs sm:hidden">
+                        <SourceLink href={a.sourceUrl} />
+                      </div>
+                    </td>
+                    <td className="tabular whitespace-nowrap px-4 py-2 text-right">
+                      <span className="sm:hidden">{formatUsdCompact(a.obligation)}</span>
+                      <span className="hidden sm:inline">{formatUsd(a.obligation)}</span>
+                    </td>
+                    <td className="hidden px-4 py-2 sm:table-cell">
+                      <SourceLink href={a.sourceUrl} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
     </div>
   );

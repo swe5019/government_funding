@@ -43,4 +43,38 @@ export const programs: ProgramConfig[] = [
     rules: { assistanceListings: ["11.037"] },
     federalRegister: { terms: ['"CHIPS Incentives Program"'], agencies: ["national-institute-of-standards-and-technology"] },
   },
+  {
+    slug: "quantum",
+    name: "Quantum technology",
+    description:
+      "Federal contracts and grants whose descriptions mention quantum computing, quantum information science, quantum sensing or networking, or qubits, from the agencies that fund most U.S. quantum work (DOE, NSF, DoD including DARPA and the service labs, Commerce/NIST and NASA). This is a keyword match on award descriptions, not an official program: it can include unrelated awards and miss awards with vague descriptions. Much quantum funding goes to universities and national labs, which count in the totals but are not public companies.",
+    sourceUrl: "https://www.quantum.gov",
+    rules: {
+      // DOE, NSF, DoD, Commerce (NIST), NASA
+      agencyCodes: ["089", "049", "097", "013", "080"],
+      // Specific phrases rather than bare "quantum", which also matches quantum dots,
+      // quantum cascade lasers, quantum efficiency and company names.
+      keywords: [
+        "quantum comput",
+        "quantum information",
+        "quantum sens",
+        "quantum network",
+        "quantum communication",
+        "quantum key distribution",
+        "quantum internet",
+        "quantum processor",
+        "quantum annealing",
+        "quantum algorithm",
+        "quantum error correction",
+        "quantum simulat",
+        "quantum technolog",
+        "quantum science",
+        "quantum benchmark",
+        "quantum navigation",
+        "quantum inertial",
+        "qubit",
+      ],
+    },
+    federalRegister: { terms: ['"National Quantum Initiative"', '"quantum information science"'] },
+  },
 ];
