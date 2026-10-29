@@ -3,6 +3,7 @@ import type { PoolClient } from "pg";
 import { dataConfig } from "@/config/data";
 import { fetchContractsPage, fetchContractsRss } from "@/lib/sources/dod/client";
 import { announcementDate, parseContractsPage, parseRss } from "@/lib/sources/dod/parse";
+import { HttpError } from "@/lib/sources/http";
 import { consoleLogger, markFresh, runChunk, type Logger } from "./runner";
 
 /**
@@ -11,8 +12,18 @@ import { consoleLogger, markFresh, runChunk, type Logger } from "./runner";
  * normalized name when exactly one business recipient has it. Company/ticker come from that
  * recipient's ticker match at display time, so review decisions apply automatically.
  */
-export async function dodAnnouncements(opts: { log?: Logger; file?: string; url?: string; date?: string } = {}) {
+export async function dodAnnouncements(
+  opts: {
+    log?: Logger;
+    file?: string;
+    url?: string;
+    date?: string;
+    fetchers?: { rss: () => Promise<string>; page: (url: string) => Promise<string> };
+  } = {},
+) {
   const log = opts.log ?? consoleLogger;
+  const fetchers = opts.fetchers ?? { rss: fetchContractsRss, page: fetchContractsPage };
+  let blocked = 0;
   await runChunk(
     { job: "dod_announcements", chunkKey: new Date().toISOString(), params: { file: opts.file ?? null }, force: true, attempts: 2, log },
     async ({ client, stats }) => {
@@ -21,7 +32,7 @@ export async function dodAnnouncements(opts: { log?: Logger; file?: string; url?
         // Local page (tests / manual backfill of a saved announcement).
         pages.push({ url: opts.url ?? `file://${opts.file}`, date: opts.date ?? new Date().toISOString().slice(0, 10), html: await readFile(opts.file, "utf8") });
       } else {
-        const items = parseRss(await fetchContractsRss());
+        const items = parseRss(await fetchers.rss());
         const { rows: seen } = await client.query<{ url: string }>(
           `SELECT DISTINCT url FROM "DodAnnouncement" WHERE url = ANY($1::text[])`,
           [items.map((i) => i.link)],
@@ -30,7 +41,19 @@ export async function dodAnnouncements(opts: { log?: Logger; file?: string; url?
         for (const item of items) {
           const date = announcementDate(item.title, item.pubDate);
           if (!item.link || !date || known.has(item.link)) continue;
-          pages.push({ url: item.link, date, html: await fetchContractsPage(item.link) });
+          try {
+            pages.push({ url: item.link, date, html: await fetchers.page(item.link) });
+          } catch (err) {
+            // The site blocks some automated clients (403). Fall back to article HTML embedded in
+            // the feed; otherwise skip the day rather than failing the daily run.
+            if (!(err instanceof HttpError && (err.status === 401 || err.status === 403))) throw err;
+            if (parseContractsPage(item.contentHtml).length) {
+              pages.push({ url: item.link, date, html: item.contentHtml });
+            } else {
+              blocked++;
+              log.error(`${item.link} -> ${err.status} (blocked); skipped`);
+            }
+          }
         }
       }
 
@@ -52,7 +75,9 @@ export async function dodAnnouncements(opts: { log?: Logger; file?: string; url?
       stats.rowsSkipped = await relink(client);
     },
   );
-  await markFresh("dod", new Date().toISOString().slice(0, 10));
+  // Freshness reflects a complete fetch; blocked days leave "last updated" where it was.
+  if (!blocked) await markFresh("dod", new Date().toISOString().slice(0, 10));
+  return { blocked };
 }
 
 /** Link recent unlinked announcements; returns how many remain unlinked. */
