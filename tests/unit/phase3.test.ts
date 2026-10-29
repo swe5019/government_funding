@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { programs } from "@/config/programs";
 import { getProvider } from "@/lib/market-data";
 import { mockProvider } from "@/lib/market-data/mock";
 import { fillMonths, pctChange, summarizePeriods } from "@/lib/periods";
@@ -69,6 +70,13 @@ describe("rulesToSql", () => {
     const r = rulesToSql({ keywords: ["50% off_"], agencyCodes: ["089"] });
     expect(r.sql).toContain(`a."awardingAgencyCode" = ANY($1::text[]) AND a.description ILIKE ANY($2::text[])`);
     expect(r.params[1]).toEqual(["%50\\% off\\_%"]);
+  });
+
+  it("every configured program has valid rules, and no keyword is a bare 'quantum'", () => {
+    for (const prog of programs) expect(() => rulesToSql(prog.rules)).not.toThrow();
+    expect(new Set(programs.map((p) => p.slug)).size).toBe(programs.length);
+    const quantum = programs.find((p) => p.slug === "quantum")!;
+    expect(quantum.rules.keywords).not.toContain("quantum");
   });
 
   it("rejects empty rules and unscoped keywords", () => {

@@ -55,6 +55,24 @@ describe.skipIf(!url)("company and program data (integration)", async () => {
     expect(rows.map((r) => r.awardId)).toEqual(["ASST_NON_CHIPS0001_1341"]);
   });
 
+  it("tags quantum awards by phrase, only from the listed agencies", async () => {
+    await q(`INSERT INTO "Agency" (code, name, "updatedAt") VALUES ('097', 'Department of Defense', now()),
+               ('089', 'Department of Energy', now()), ('075', 'Department of Health and Human Services', now())
+             ON CONFLICT (code) DO NOTHING`);
+    const award = (id: string, agency: string, description: string) =>
+      q(`INSERT INTO "Award" (id, category, "awardingAgencyCode", description, "totalObligated", "lastModifiedDate", "sourceUrl")
+         VALUES ($1, 'CONTRACT', $2, $3, 1000000, '2026-03-01', 'https://www.usaspending.gov/award/' || $1)`, [id, agency, description]);
+    await award("Q_DARPA", "097", "QUANTUM BENCHMARKING INITIATIVE STAGE B");
+    await award("Q_DOE", "089", "Superconducting QUBIT fabrication for quantum computing testbeds");
+    await award("Q_DOT", "097", "QUANTUM DOT DISPLAY PANELS");
+    await award("Q_HHS", "075", "QUANTUM COMPUTING FOR DRUG DISCOVERY");
+    await tagPrograms({ log: silent });
+    const rows = await q<{ awardId: string }>(`SELECT "awardId" FROM "AwardProgram" WHERE "programSlug" = 'quantum' ORDER BY 1`);
+    expect(rows.map((r) => r.awardId)).toEqual(["Q_DARPA", "Q_DOE"]);
+    await q(`DELETE FROM "Award" WHERE id LIKE 'Q\\_%'`);
+    await tagPrograms({ log: silent });
+  });
+
   it("lists public companies receiving program funds", async () => {
     const { confirmed, possible } = await programs.getProgramCompanies("chips-act", realtime);
     expect(confirmed).toMatchObject([{ cik: MU, ticker: "MU", total: 500_000_000, awards: 1 }]);
@@ -63,7 +81,7 @@ describe.skipIf(!url)("company and program data (integration)", async () => {
     expect(summary).toMatchObject({ total: 500_000_000, publicTotal: 500_000_000, awardCount: 1, recipientCount: 1 });
     const [largest] = await programs.getProgramLargestAwards("chips-act", realtime);
     expect(largest).toMatchObject({ ticker: "MU", sourceUrl: expect.stringMatching(/^https:\/\/www\.usaspending\.gov\/award\//) });
-    expect((await programs.listPrograms(realtime))[0]).toMatchObject({ slug: "chips-act", publicCompanies: 1 });
+    expect((await programs.listPrograms(realtime)).find((p) => p.slug === "chips-act")).toMatchObject({ publicCompanies: 1 });
   });
 
   it("finds companies by any share-class ticker", async () => {
