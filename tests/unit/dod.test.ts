@@ -50,5 +50,16 @@ describe("helpers", () => {
     ]);
     expect(announcementDate(items[1].title, items[1].pubDate)).toBe("2026-10-15");
     expect(announcementDate("Contracts", new Date("2026-10-14T21:00:00Z"))).toBe("2026-10-14");
+    expect(items[0].contentHtml).toBe("");
+  });
+  it("RSS embedded article HTML, escaped or CDATA", () => {
+    const para = "Acme Corp., Austin, Texas, is awarded a $9,000,000 contract (W912DY-26-C-0001). Army Corps, Huntsville, Alabama, is the contracting activity.";
+    const xml = `<rss><channel>
+      <item><title>Contracts For Oct. 20, 2026</title><link>https://x/1</link><description>&lt;p&gt;ARMY&lt;/p&gt;&lt;p&gt;${para}&lt;/p&gt;</description></item>
+      <item><title>Contracts For Oct. 21, 2026</title><link>https://x/2</link><content:encoded><![CDATA[<p>${para}</p>]]></content:encoded><description>short</description></item>
+    </channel></rss>`;
+    const [a, b] = parseRss(xml);
+    expect(parseContractsPage(a.contentHtml)).toMatchObject([{ branch: "ARMY", contractorName: "Acme Corp.", contractNumber: "W912DY-26-C-0001" }]);
+    expect(parseContractsPage(b.contentHtml)).toHaveLength(1);
   });
 });
