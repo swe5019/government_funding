@@ -16,7 +16,7 @@ Go through the steps in order. Each one says what to copy where.
 ## 1. Neon
 
 1. Create a project (Postgres 16, region close to your Vercel region, e.g. `us-east-1`/`iad1`).
-2. Create a database `fedflow`. In **Connection details** copy two strings:
+2. The default database (`neondb`) is fine. In **Connection details** copy two strings:
    - **Pooled** (host contains `-pooler`) → `DATABASE_URL`. The app uses it.
    - **Direct** (toggle "Connection pooling" off) → `DIRECT_URL`. Migrations and ingestion use it; the
      jobs' advisory locks don't work through the pooler.
@@ -38,12 +38,12 @@ Go through the steps in order. Each one says what to copy where.
 
 1. Add and verify your sending domain (DNS: SPF, DKIM; add DMARC too).
 2. Create an API key with "Sending access" → `RESEND_API_KEY`.
-3. `EMAIL_FROM="FedFlow <no-reply@yourdomain.com>"`, on the verified domain.
+3. `EMAIL_FROM="Alloqent <no-reply@alloqent.com>"`, on the verified domain.
 
 ## 3. Google sign-in (optional)
 
 Google Cloud Console → APIs & Services → Credentials → OAuth client ID (Web):
-- Authorized redirect URI: `https://yourdomain.com/api/auth/callback/google`
+- Authorized redirect URI: `https://alloqent.com/api/auth/callback/google`
   (add the Vercel preview URL too if you want it there).
 - Publish the consent screen (it stays in "testing" otherwise and only listed users can sign in).
 - Copy the client ID and secret to `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET`. Without them the Google button is hidden.
@@ -51,7 +51,7 @@ Google Cloud Console → APIs & Services → Credentials → OAuth client ID (We
 ## 4. Stripe
 
 Follow [BILLING.md](BILLING.md): products and prices, Customer Portal, the webhook endpoint
-`https://yourdomain.com/api/stripe/webhook`. Do it in test mode first, then repeat in live mode and swap
+`https://alloqent.com/api/stripe/webhook`. Do it in test mode first, then repeat in live mode and swap
 the live keys and price IDs into the Production environment only.
 
 ## 5. Sentry (optional)
@@ -82,15 +82,15 @@ Mention Sentry as a processor in your privacy policy if you enable it.
    |---|---|
    | `DATABASE_URL` | Neon pooled string |
    | `DIRECT_URL` | Neon direct string (migrations at build) |
-   | `NEXT_PUBLIC_APP_URL` | `https://yourdomain.com` (canonical URLs, sitemap, emails, Stripe return URLs) |
-   | `AUTH_URL` | `https://yourdomain.com` |
+   | `NEXT_PUBLIC_APP_URL` | `https://alloqent.com` (canonical URLs, sitemap, emails, Stripe return URLs) |
+   | `AUTH_URL` | `https://alloqent.com` |
    | `AUTH_SECRET` | `openssl rand -base64 32` |
    | `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` | optional |
    | `RESEND_API_KEY`, `EMAIL_FROM` | from step 2 |
    | `ADMIN_EMAILS` | comma-separated admin emails |
    | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | live values in Production |
    | `STRIPE_PRICE_PRO_MONTHLY`, `STRIPE_PRICE_PRO_ANNUAL` | live price IDs |
-   | `SEC_USER_AGENT` | `"FedFlow you@yourdomain.com"` |
+   | `SEC_USER_AGENT` | `"Alloqent you@alloqent.com"` |
    | `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_ENVIRONMENT=production` | optional |
    | `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` | optional, build only |
    | `MARKET_DATA_PROVIDER`, `MARKET_DATA_API_KEY` | leave unset until a licensed provider is chosen; `mock` is ignored in production |
@@ -149,7 +149,7 @@ Check `/admin/ingestion` after each step: every chunk is logged with row counts 
 
 - `robots.txt` and `sitemap.xml` are generated (`src/app/robots.ts`, `src/app/sitemap.ts`). The sitemap
   reads the database per request and lists the static pages, programs, and companies with a confirmed
-  link. Submit `https://yourdomain.com/sitemap.xml` in Google Search Console and Bing Webmaster Tools.
+  link. Submit `https://alloqent.com/sitemap.xml` in Google Search Console and Bing Webmaster Tools.
 - Company and program pages set canonical URLs; company pages include `Dataset` structured data.
 - Account, admin, watchlist and sign-in pages are disallowed in robots.txt and/or marked `noindex`.
 - With streaming, pages that resolve to "not found" after the shell is sent return HTTP 200 with

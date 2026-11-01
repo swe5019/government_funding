@@ -2,7 +2,7 @@ name: Ingest
 
 # Ingestion runs here rather than on Vercel: bulk downloads take minutes to hours.
 # Repository secrets: DIRECT_URL (Neon *unpooled* connection string), SEC_USER_AGENT
-# ("FedFlow you@domain.com"), SAM_API_KEY (optional; parent lookups are skipped without it).
+# ("Alloqent you@alloqent.com"), SAM_API_KEY (optional; parent lookups are skipped without it).
 
 on:
   schedule:
