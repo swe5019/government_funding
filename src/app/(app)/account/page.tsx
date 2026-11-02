@@ -5,7 +5,9 @@ import { Suspense } from "react";
 import { plans } from "@/config/plans";
 import { formatDate } from "@/lib/format";
 import { getViewer } from "@/lib/gating/viewer";
+import { DELETE_CONFIRMATION } from "@/lib/account/delete";
 import { manageBillingAction, signOutAction } from "../pricing/actions";
+import { deleteAccountAction } from "./actions";
 
 export const metadata: Metadata = { title: "Account", robots: { index: false } };
 
@@ -92,6 +94,31 @@ async function Account({ searchParams }: { searchParams: PageProps<"/account">["
       <form action={signOutAction}>
         <button className={btn}>Sign out</button>
       </form>
+
+      <section className="space-y-3 rounded-md border border-warn-fg/40 bg-surface p-4 text-sm" aria-labelledby="delete-heading">
+        <h2 id="delete-heading" className="font-semibold">Delete account</h2>
+        <p className="text-muted">
+          Permanently deletes your account, watchlists, alerts and sessions{viewer.user.stripeCustomerId ? ", and cancels your subscription immediately with no refund for the current period" : ""}.
+          This can&rsquo;t be undone.
+        </p>
+        {sp.delete === "confirm" && (
+          <p role="alert" className="text-warn-fg">Type {DELETE_CONFIRMATION} in capitals to confirm.</p>
+        )}
+        {sp.delete === "billing" && (
+          <p role="alert" className="text-warn-fg">
+            We couldn&rsquo;t cancel your subscription just now, so nothing was deleted. Please try again in a minute.
+          </p>
+        )}
+        <form action={deleteAccountAction} className="flex flex-wrap items-end gap-2">
+          <label className="space-y-1">
+            <span className="block text-xs text-muted">Type {DELETE_CONFIRMATION} to confirm</span>
+            <input name="confirm" required autoComplete="off" className="rounded-md border border-line bg-surface px-2 py-1.5" />
+          </label>
+          <button className="rounded-md border border-warn-fg px-4 py-2 font-medium text-warn-fg hover:bg-warn-bg">
+            Delete my account
+          </button>
+        </form>
+      </section>
     </>
   );
 }

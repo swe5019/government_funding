@@ -83,10 +83,39 @@ test.describe("Pro user", () => {
 test.describe("admin", () => {
   test.beforeEach(async ({ signInAs }) => signInAs("admin"));
 
+  test("users page lists sign-ups with totals", async ({ page }) => {
+    const res = await page.goto("/admin/users");
+    expect(res?.status()).toBe(200);
+    await expect(page.getByRole("heading", { name: "Users" })).toBeVisible();
+    await expect(page.getByRole("cell", { name: /pro@e2e\.test/ })).toBeVisible();
+    await page.getByLabel("Search users by email").fill("admin@");
+    await page.getByRole("button", { name: "Search" }).click();
+    await expect(page.getByRole("cell", { name: /pro@e2e\.test/ })).toHaveCount(0);
+    await expect(page.getByRole("cell", { name: /admin@e2e\.test/ })).toBeVisible();
+    await expectAccessible(page);
+  });
+
   test("match review queue loads", async ({ page }) => {
     const res = await page.goto("/admin/matches");
     expect(res?.status()).toBe(200);
     await expect(page.getByRole("heading", { name: "Ticker match review" })).toBeVisible();
     await expectAccessible(page);
+  });
+});
+
+test.describe("account deletion", () => {
+  test.beforeEach(async ({ signInAs }) => signInAs("leaving"));
+
+  test("requires typing DELETE, then removes the account and signs out", async ({ page }) => {
+    await page.goto("/account");
+    await page.getByLabel(/Type DELETE to confirm/).fill("delete");
+    await page.getByRole("button", { name: "Delete my account" }).click();
+    await expect(page.getByText("Type DELETE in capitals to confirm.")).toBeVisible();
+
+    await page.getByLabel(/Type DELETE to confirm/).fill("DELETE");
+    await page.getByRole("button", { name: "Delete my account" }).click();
+    await expect(page.getByRole("heading", { name: "Your account has been deleted" })).toBeVisible();
+    await page.goto("/account");
+    await expect(page).toHaveURL(/\/signin/);
   });
 });

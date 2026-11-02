@@ -85,31 +85,42 @@ export async function usaspendingBackfill(opts: BackfillOptions = {}) {
 }
 
 /**
- * Daily incremental: everything modified since the last load (minus an overlap window to catch
- * late-arriving edits). New rows get availableAt = now(), which drives the free-tier delay and alerts.
+ * The daily job's request per file kind: contracts modified since the last load (minus an
+ * overlap window); assistance by action date over a fixed lookback (see dataConfig).
+ */
+export function dailyRequests(lastThrough: Date | null, today: Date): BulkDownloadRequest[] {
+  const from = new Date(lastThrough ?? today);
+  from.setUTCDate(from.getUTCDate() - dataConfig.incrementalOverlapDays);
+  const assistanceFrom = new Date(today);
+  assistanceFrom.setUTCDate(assistanceFrom.getUTCDate() - dataConfig.assistanceDailyLookbackDays);
+  return [
+    { kind: "contracts", dateType: "last_modified_date", startDate: iso(from), endDate: iso(today) },
+    { kind: "assistance", dateType: "action_date", startDate: iso(assistanceFrom), endDate: iso(today) },
+  ];
+}
+
+/**
+ * Daily incremental load. New rows get availableAt = now(), which drives the free-tier delay
+ * and alerts; rows already loaded keep theirs and are only updated when their content changed.
  */
 export async function usaspendingDaily(opts: { log?: Logger; limit?: number } = {}) {
   const log = opts.log ?? consoleLogger;
   const { rows } = await jobPool().query<{ through: Date }>(
     `SELECT "dataThrough" AS through FROM "DataFreshness" WHERE source = 'usaspending'`,
   );
-  const today = new Date();
-  const from = new Date(rows[0]?.through ?? today);
-  from.setUTCDate(from.getUTCDate() - dataConfig.incrementalOverlapDays);
-  const range = { startDate: iso(from), endDate: iso(today) };
 
-  for (const kind of KINDS) {
+  for (const req of dailyRequests(rows[0]?.through ?? null, new Date())) {
     let maxLm: string | null = null;
     await runChunk(
       {
         job: "usaspending_daily",
-        chunkKey: `${kind}:${range.startDate}..${range.endDate}`,
-        params: { kind, ...range, limit: opts.limit },
+        chunkKey: `${req.kind}:${req.dateType}:${req.startDate}..${req.endDate}`,
+        params: { ...req, limit: opts.limit },
         force: true,
         log,
       },
       async (ctx) => {
-        const r = await downloadAndLoad({ kind, dateType: "last_modified_date", ...range }, ctx, { kind: "now" }, opts.limit);
+        const r = await downloadAndLoad(req, ctx, { kind: "now" }, opts.limit);
         maxLm = r.maxLastModified;
       },
     );
