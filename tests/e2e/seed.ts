@@ -34,6 +34,10 @@ async function main() {
   await matchTickers({ full: true, log: silent });
   await rollupCompanies({ log: silent });
 
+  // A company named in an announced commitment (src/config/commitments.ts), for linking.
+  await q(`INSERT INTO "Company" (cik, ticker, tickers, name, "isMajorExchange", "updatedAt")
+           VALUES ('0002000001', 'QNT', '{QNT}', 'Quantinuum, Inc.', true, now())`);
+
   const expires = new Date(Date.now() + 86_400_000);
   for (const u of Object.values(E2E_USERS)) {
     await q(

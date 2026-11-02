@@ -58,3 +58,18 @@ test("security headers are set", async ({ request }) => {
   expect(res.headers()["x-content-type-options"]).toBe("nosniff");
   expect(res.headers()["x-powered-by"]).toBeUndefined();
 });
+
+test("announced commitments show on the program page and the named company's page, outside the totals", async ({ page }) => {
+  await page.goto("/program/quantum");
+  const section = page.locator("section", { has: page.getByRole("heading", { name: "Announced, not yet awarded" }) });
+  await expect(section).toBeVisible();
+  await expect(section.getByText("Letter of intent")).toBeVisible();
+  await expect(section.getByRole("cell", { name: "PsiQuantum" })).toBeVisible();
+  await expect(section.getByText("$2,013,000,000")).toBeVisible();
+  await section.getByRole("link", { name: "QNT" }).click();
+  await expect(page).toHaveURL(/\/company\/QNT$/);
+  const onCompany = page.locator("section", { has: page.getByRole("heading", { name: "Announced, not yet awarded" }) });
+  await expect(onCompany.getByRole("cell", { name: "Quantinuum" })).toBeVisible();
+  await expect(onCompany.getByRole("cell", { name: "IBM" })).toHaveCount(0);
+  await expectAccessible(page);
+});
