@@ -85,8 +85,9 @@ export async function usaspendingBackfill(opts: BackfillOptions = {}) {
 }
 
 /**
- * The daily job's request per file kind: contracts modified since the last load (minus an
- * overlap window); assistance by action date over a fixed lookback (see dataConfig).
+ * The daily job's requests: both kinds modified since the last load (minus an overlap window),
+ * plus assistance by action date over a fixed lookback (see dataConfig). Overlapping rows are
+ * idempotent upserts.
  */
 export function dailyRequests(lastThrough: Date | null, today: Date): BulkDownloadRequest[] {
   const from = new Date(lastThrough ?? today);
@@ -95,6 +96,7 @@ export function dailyRequests(lastThrough: Date | null, today: Date): BulkDownlo
   assistanceFrom.setUTCDate(assistanceFrom.getUTCDate() - dataConfig.assistanceDailyLookbackDays);
   return [
     { kind: "contracts", dateType: "last_modified_date", startDate: iso(from), endDate: iso(today) },
+    { kind: "assistance", dateType: "last_modified_date", startDate: iso(from), endDate: iso(today) },
     { kind: "assistance", dateType: "action_date", startDate: iso(assistanceFrom), endDate: iso(today) },
   ];
 }
