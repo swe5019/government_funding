@@ -28,7 +28,7 @@ async function downloadAndLoad(req: BulkDownloadRequest, ctx: ChunkContext, avai
   const fileName = await requestBulkDownload(req);
   ctx.log.info(`requested ${req.kind} ${req.dateType} ${req.startDate}..${req.endDate} -> ${fileName}`);
   const url = await waitForDownload(fileName, ctx.log.info);
-  const dir = path.join(os.tmpdir(), "fedflow-usaspending");
+  const dir = path.join(os.tmpdir(), "alloqent-usaspending");
   const file = await downloadToFile(url, dir);
   try {
     return await loadUsaspendingFile(file, ctx, { availability, limit, kind: req.kind });

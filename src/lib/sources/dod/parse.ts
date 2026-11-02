@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { normalizeName } from "@/lib/mapping/normalize";
-import { htmlToText, paragraphs } from "@/lib/sources/html";
+import { decodeEntities, htmlToText, paragraphs } from "@/lib/sources/html";
 
 /**
  * Parser for defense.gov "Contracts for <date>" pages. Each contract is one paragraph:
@@ -78,16 +78,27 @@ export interface RssItem {
   title: string;
   link: string;
   pubDate: Date | null;
+  /** Article HTML when the feed embeds it (content:encoded or description), else "". */
+  contentHtml: string;
 }
 
 export function parseRss(xml: string): RssItem[] {
   return [...xml.matchAll(/<item\b[\s\S]*?<\/item>/gi)].map((m) => {
-    const get = (tag: string) => {
-      const r = new RegExp(`<${tag}\\b[^>]*>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?</${tag}>`, "i").exec(m[0]);
-      return r ? htmlToText(r[1]) : "";
+    const inner = (tag: string) =>
+      new RegExp(`<${tag}\\b[^>]*>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?</${tag}>`, "i").exec(m[0])?.[1] ?? "";
+    const get = (tag: string) => htmlToText(inner(tag));
+    // Embedded article HTML; without CDATA it arrives entity-escaped (&lt;p&gt;).
+    const html = (tag: string) => {
+      const v = inner(tag);
+      return /&lt;p\b/i.test(v) ? decodeEntities(v) : v;
     };
     const d = get("pubDate");
-    return { title: get("title"), link: get("link"), pubDate: d ? new Date(d) : null };
+    return {
+      title: get("title"),
+      link: get("link"),
+      pubDate: d ? new Date(d) : null,
+      contentHtml: html("content:encoded") || html("description"),
+    };
   });
 }
 

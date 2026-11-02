@@ -1,4 +1,4 @@
-// FedFlow database schema.
+// Alloqent database schema.
 //
 // Conventions
 // - Government records use their natural keys as primary keys (agency code, UEI,

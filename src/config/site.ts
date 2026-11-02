@@ -1,9 +1,9 @@
 /** Single place to rename the product. */
 export const siteConfig = {
-  name: "FedFlow",
+  name: "Alloqent",
   tagline: "Follow federal money to public companies.",
   url: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
-  supportEmail: "support@example.com",
+  supportEmail: "support@alloqent.com",
 } as const;
 
 export const DISCLAIMER =

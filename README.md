@@ -1,7 +1,7 @@
-# FedFlow
+# Alloqent
 
 Tracks which publicly traded companies receive U.S. federal money (contracts, grants, program funding) and
-how that relates to their stock. "FedFlow" is a placeholder name, set once in `src/config/site.ts`.
+how that relates to their stock. Domain: alloqent.com. The name is set once in `src/config/site.ts`.
 
 **Informational only. Not investment advice.**
 

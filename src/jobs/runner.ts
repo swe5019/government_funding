@@ -11,16 +11,65 @@ import { retry } from "@/lib/retry";
  *
  * Jobs must connect with the direct (non-pooled) URL: session advisory locks do not survive
  * PgBouncer transaction pooling (Neon "-pooler" hosts).
+ *
+ * Neon suspends a compute after 5 idle minutes and drops its connections. Jobs hold connections
+ * while waiting minutes for bulk downloads, so held clients send a periodic heartbeat, and a
+ * dropped connection becomes an error on the next query (retried) instead of crashing the process.
  */
 
 let pool: Pool | undefined;
 
 export function jobPool(): Pool {
-  pool ??= new Pool({
-    connectionString: process.env.DIRECT_URL ?? process.env.DATABASE_URL,
-    max: 4,
-  });
+  if (!pool) {
+    pool = new Pool({
+      connectionString: process.env.DIRECT_URL ?? process.env.DATABASE_URL,
+      max: 4,
+    });
+    // An idle pooled connection that the server closes must not crash the job.
+    pool.on("error", (err) => consoleLogger.error(`idle database connection closed: ${err.message}`));
+  }
   return pool;
+}
+
+const HEARTBEAT_MS = 60_000;
+
+/**
+ * Check out a client that survives server-side disconnects (the error surfaces on its next query)
+ * and pings while held, so long waits on other work don't let the compute suspend.
+ */
+export async function holdClient(): Promise<{ client: PoolClient; release: () => void }> {
+  const client = await jobPool().connect();
+  let lost = false;
+  const onError = (err: Error) => {
+    lost = true;
+    consoleLogger.error(`database connection lost: ${err.message}`);
+  };
+  client.on("error", onError);
+  const stop = keepAlive(client);
+  return {
+    client,
+    release: () => {
+      stop();
+      client.off("error", onError);
+      // A broken connection is destroyed rather than returned to the pool.
+      client.release(lost ? new Error("connection lost") : undefined);
+    },
+  };
+}
+
+/** Run `SELECT 1` every `everyMs` while nothing else is pending from the heartbeat. */
+export function keepAlive(client: Pick<PoolClient, "query">, everyMs = HEARTBEAT_MS): () => void {
+  let pending = false;
+  const timer = setInterval(() => {
+    if (pending) return;
+    pending = true;
+    client
+      .query("SELECT 1")
+      .catch(() => {}) // the owner's next query reports the failure
+      .finally(() => (pending = false));
+  }, everyMs);
+  timer.unref();
+  return () => clearInterval(timer);
 }
 
 export async function closeJobPool() {
@@ -45,7 +94,7 @@ function lockId(name: string): string {
 
 /** Hold a session-level advisory lock for the duration of fn, or throw if another run holds it. */
 export async function withJobLock<T>(name: string, fn: () => Promise<T>): Promise<T> {
-  const client = await jobPool().connect();
+  const { client, release } = await holdClient();
   try {
     const { rows } = await client.query<{ ok: boolean }>("SELECT pg_try_advisory_lock($1::bigint) AS ok", [
       lockId(name),
@@ -54,10 +103,11 @@ export async function withJobLock<T>(name: string, fn: () => Promise<T>): Promis
     try {
       return await fn();
     } finally {
-      await client.query("SELECT pg_advisory_unlock($1::bigint)", [lockId(name)]);
+      // If the connection dropped, the server already released the session lock.
+      await client.query("SELECT pg_advisory_unlock($1::bigint)", [lockId(name)]).catch(() => {});
     }
   } finally {
-    client.release();
+    release();
   }
 }
 
@@ -116,7 +166,7 @@ export async function runChunk(
       );
       const runId = rows[0].id;
       const stats: ChunkStats = { rowsRead: 0, rowsUpserted: 0, rowsSkipped: 0 };
-      const client = await db.connect();
+      const { client, release } = await holdClient();
       try {
         log.info(`${opts.job} ${opts.chunkKey}: attempt ${attempt} started (run ${runId})`);
         await work({ client, log, attempt, stats });
@@ -139,7 +189,7 @@ export async function runChunk(
         log.error(`${opts.job} ${opts.chunkKey}: attempt ${attempt} failed: ${err instanceof Error ? err.message : msg}`);
         throw err;
       } finally {
-        client.release();
+        release();
       }
     },
     { attempts: opts.attempts ?? 3, baseDelayMs: opts.baseDelayMs ?? 30_000 },

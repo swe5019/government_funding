@@ -59,6 +59,31 @@ describe.skipIf(!url)("Phase 6 sources (integration)", async () => {
     ]);
   });
 
+  it("DoD announcements: a blocked page (403) falls back to feed content or is skipped without failing", async () => {
+    const { HttpError } = await import("@/lib/sources/http");
+    const para = "Acme Corp., Austin, Texas, is awarded a $9,000,000 contract (W912DY-26-C-0001). Army Corps, Huntsville, Alabama, is the contracting activity.";
+    const rss = `<rss><channel>
+      <item><title>Contracts For Oct. 20, 2026</title><link>https://www.war.gov/x/20</link><description>&lt;p&gt;${para}&lt;/p&gt;</description></item>
+      <item><title>Contracts For Oct. 21, 2026</title><link>https://www.war.gov/x/21</link></item>
+    </channel></rss>`;
+    const before = await q(`SELECT "lastSuccessfulAt" FROM "DataFreshness" WHERE source = 'dod'`);
+    const res = await dodAnnouncements({
+      log: silent,
+      fetchers: {
+        rss: async () => rss,
+        page: async (u) => {
+          throw new HttpError(403, `GET ${u} -> 403`);
+        },
+      },
+    });
+    expect(res).toEqual({ blocked: 1 });
+    expect(await q(`SELECT "contractorName", url FROM "DodAnnouncement" WHERE url LIKE 'https://www.war.gov/%'`)).toEqual([
+      { contractorName: "Acme Corp.", url: "https://www.war.gov/x/20" },
+    ]);
+    expect(await q(`SELECT "lastSuccessfulAt" FROM "DataFreshness" WHERE source = 'dod'`)).toEqual(before);
+    await q(`DELETE FROM "DodAnnouncement" WHERE url LIKE 'https://www.war.gov/%'`);
+  });
+
   it("SAM.gov award notices: stored and linked by awardee UEI", async () => {
     await samOpportunities({
       log: silent,

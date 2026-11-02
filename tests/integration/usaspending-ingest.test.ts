@@ -47,7 +47,7 @@ describe.skipIf(!url)("USAspending ingestion (integration)", async () => {
   });
 
   it("ignores an older version of a record", async () => {
-    const dir = await mkdtemp(path.join(os.tmpdir(), "fedflow-test-"));
+    const dir = await mkdtemp(path.join(os.tmpdir(), "alloqent-test-"));
     const stale = path.join(dir, "stale.csv");
     await writeFile(
       stale,
