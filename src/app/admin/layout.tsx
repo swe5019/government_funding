@@ -21,6 +21,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
         <Link href="/admin/matches" className="hover:underline">Ticker matches</Link>
         <Link href="/admin/matches?tab=unmatched" className="hover:underline">Unmatched</Link>
         <Link href="/admin/ingestion" className="hover:underline">Ingestion runs</Link>
+        <Link href="/admin/users" className="hover:underline">Users</Link>
       </nav>
       {children}
     </div>

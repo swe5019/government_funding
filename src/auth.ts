@@ -5,6 +5,7 @@ import Resend from "next-auth/providers/resend";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
 import { isAdminEmail } from "@/lib/auth/admins";
+import { SESSION_MAX_AGE_S } from "@/lib/auth/session";
 import { MAGIC_LINK_MAX_AGE_S, tooManyLinks } from "@/lib/auth/throttle";
 import { sendEmail } from "@/lib/email/send";
 import { magicLinkEmail } from "@/lib/email/templates";
@@ -18,7 +19,7 @@ export const googleEnabled = Boolean(process.env.AUTH_GOOGLE_ID && process.env.A
 export const { handlers, auth, signIn, signOut } = NextAuth({
   // The adapter's types target @prisma/client; our client is generated to src/generated (Prisma 7).
   adapter: PrismaAdapter(prisma as unknown as Parameters<typeof PrismaAdapter>[0]),
-  session: { strategy: "database", maxAge: 30 * 24 * 60 * 60 },
+  session: { strategy: "database", maxAge: SESSION_MAX_AGE_S },
   trustHost: true,
   pages: { signIn: "/signin", verifyRequest: "/signin/check-email", error: "/signin" },
   providers: [

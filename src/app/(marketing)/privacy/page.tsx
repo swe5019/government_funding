@@ -11,6 +11,11 @@ export default function PrivacyPage() {
       <p className="rounded-md bg-warn-bg p-3 text-sm text-warn-fg">
         Placeholder. This page will be replaced with the final Privacy Policy before {siteConfig.name} launches.
       </p>
+      <p className="text-sm">
+        You can delete your account at any time from your Account page. Deletion removes your account, watchlists, alert
+        history and sign-in sessions and cancels any subscription; payment records are kept by our payment processor as the
+        law requires.
+      </p>
       <p className="text-sm text-muted">Questions: {siteConfig.supportEmail}</p>
     </article>
   );

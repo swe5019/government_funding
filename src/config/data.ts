@@ -4,6 +4,12 @@ export const dataConfig = {
   backfillYears: 3,
   /** Daily incremental re-reads this many days before the last loaded date to catch late edits. */
   incrementalOverlapDays: 3,
+  /**
+   * USAspending's bulk download returns no assistance rows when filtered by last_modified_date
+   * (seen Oct-Nov 2026; contracts are fine), so the daily job re-reads assistance by action date
+   * over this window instead. Agencies report assistance within 30 days of the action.
+   */
+  assistanceDailyLookbackDays: 45,
   /** Rows per bulk upsert statement. */
   upsertBatchSize: 2000,
   usaspending: {
