@@ -98,7 +98,12 @@ export interface ProgramCompany {
   cik: string;
   ticker: string;
   name: string;
+  /** Net obligations: additions minus reductions in the window. */
   total: number;
+  /** New awards and increases (positive transactions). */
+  added: number;
+  /** De-obligations (negative transactions), as a negative number or 0. */
+  reduced: number;
   awards: number;
   latestAction: Date;
 }
@@ -109,15 +114,19 @@ export async function getProgramCompanies(
   win: DataWindow,
 ): Promise<{ confirmed: ProgramCompany[]; possible: ProgramCompany[] }> {
   const query = (predicate: string) =>
-    prisma.$queryRawUnsafe<(Omit<ProgramCompany, "total"> & { total: string })[]>(
-      `SELECT c.cik, c.ticker, c.name, SUM(t.obligation)::text AS total, COUNT(DISTINCT a.id)::int AS awards,
+    prisma.$queryRawUnsafe<(Omit<ProgramCompany, "total" | "added" | "reduced"> & { total: string; added: string; reduced: string })[]>(
+      `SELECT c.cik, c.ticker, c.name, SUM(t.obligation)::text AS total,
+              COALESCE(SUM(t.obligation) FILTER (WHERE t.obligation > 0), 0)::text AS added,
+              COALESCE(SUM(t.obligation) FILTER (WHERE t.obligation < 0), 0)::text AS reduced,
+              COUNT(DISTINCT a.id)::int AS awards,
               MAX(t."actionDate") AS "latestAction"
        ${scopedTx(scope, `JOIN "Company" c ON c.cik = tm."companyCik"`, "JOIN")} AND ${predicate}
        GROUP BY c.cik, c.ticker, c.name ORDER BY SUM(t.obligation) DESC LIMIT 100`,
       ...windowArgs(scope, win),
     );
   const [confirmed, possible] = await Promise.all([query(CONFIRMED_SQL), query(POSSIBLE_SQL)]);
-  const toNum = (rows: Awaited<ReturnType<typeof query>>) => rows.map((r) => ({ ...r, total: Number(r.total) }));
+  const toNum = (rows: Awaited<ReturnType<typeof query>>) =>
+    rows.map((r) => ({ ...r, total: Number(r.total), added: Number(r.added), reduced: Number(r.reduced) }));
   return { confirmed: toNum(confirmed), possible: toNum(possible) };
 }
 
