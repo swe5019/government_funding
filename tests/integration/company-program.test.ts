@@ -18,6 +18,7 @@ describe.skipIf(!url)("company and program data (integration)", async () => {
   const { matchTickers } = await import("@/jobs/match-tickers");
   const { rollupCompanies } = await import("@/jobs/rollup-companies");
   const { tagPrograms } = await import("@/jobs/tag-programs");
+  const { rollupSummaries } = await import("@/jobs/rollup-summaries");
   const { syncPrices } = await import("@/jobs/prices");
   const companies = await import("@/lib/companies");
   const programs = await import("@/lib/programs/queries");
@@ -73,6 +74,51 @@ describe.skipIf(!url)("company and program data (integration)", async () => {
     await tagPrograms({ log: silent });
   });
 
+  it("themes: whole-word keywords, exclusions, agency-wide and industry-code rules", async () => {
+    await q(`INSERT INTO "Agency" (code, name, "updatedAt") VALUES ('097', 'Department of Defense', now()),
+               ('070', 'Department of Homeland Security', now()), ('080', 'National Aeronautics and Space Administration', now()),
+               ('015', 'Department of Justice', now())
+             ON CONFLICT (code) DO NOTHING`);
+    const award = (id: string, agency: string, description: string, naics: string | null = null, psc: string | null = null) =>
+      q(`INSERT INTO "Award" (id, category, "awardingAgencyCode", description, "naicsCode", "pscCode", "totalObligated", "lastModifiedDate", "sourceUrl")
+         VALUES ($1, 'CONTRACT', $2, $3, $4, $5, 1000000, '2026-03-01', 'https://www.usaspending.gov/award/' || $1)`,
+        [id, agency, description, naics, psc]);
+    await award("T_UAS", "097", "SMALL UAS RECONNAISSANCE KITS");
+    await award("T_PERSUASIVE", "015", "PERSUASIVE COMMUNICATIONS TRAINING");
+    await award("T_UASI", "070", "UASI GRANT ADMINISTRATION SUPPORT FOR SMALL UAS"); // excluded: UASI
+    await award("T_NASA", "080", "WIND TUNNEL MAINTENANCE");
+    await award("T_SATNAICS", "097", "SPARES", "336414");
+    await award("T_SATOFFICE", "097", "LEASE OF SATELLITE OFFICE SPACE");
+    await tagPrograms({ log: silent });
+    const tagged = async (slug: string) =>
+      (await q<{ awardId: string }>(`SELECT "awardId" FROM "AwardProgram" WHERE "programSlug" = $1 AND "awardId" LIKE 'T\\_%' ORDER BY 1`, [slug])).map(
+        (r) => r.awardId,
+      );
+    expect(await tagged("drones")).toEqual(["T_UAS"]);
+    expect(await tagged("space")).toEqual(["T_NASA", "T_SATNAICS"]);
+    await q(`DELETE FROM "Award" WHERE id LIKE 'T\\_%'`);
+    await tagPrograms({ log: silent });
+  });
+
+  it("grant program directory: per-plan totals, titles, search and detail queries", async () => {
+    await rollupSummaries({ log: silent });
+    const { listGrantPrograms, getGrantProgram, grantProgramName } = await import("@/lib/programs/grant-programs");
+    const all = await listGrantPrograms({ plan: "pro" });
+    expect(all.rows.map((r) => r.number)).toEqual(["11.037", "10.051", "47.049"]);
+    expect(all.rows[0]).toMatchObject({ title: "CHIPS Incentives Program", total: 500_000_000, publicTotal: 500_000_000, publicCompanies: 1 });
+    expect(all.rows[0].agencyName).toBe("Department of Commerce");
+    expect((await listGrantPrograms({ plan: "pro", sort: "public" })).rows[0].number).toBe("11.037");
+    expect((await listGrantPrograms({ plan: "pro", q: "chips" })).rows.map((r) => r.number)).toEqual(["11.037"]);
+    expect((await listGrantPrograms({ plan: "pro", q: "47.0" })).rows.map((r) => r.number)).toEqual(["47.049"]);
+    expect((await listGrantPrograms({ plan: "pro", q: "agriculture" })).rows.map((r) => r.number)).toEqual(["10.051"]);
+    expect((await listGrantPrograms({ plan: "pro", q: "100%" })).rows).toEqual([]);
+    const listing = (await getGrantProgram("47.049"))!;
+    expect(grantProgramName(listing)).toBe("Assistance Listing 47.049");
+    const companies = await programs.getProgramCompanies({ listing: "11.037" }, realtime);
+    expect(companies.confirmed).toMatchObject([{ ticker: "MU", total: 500_000_000 }]);
+    expect((await programs.getProgramSummary({ listing: "11.037" }, realtime)).total).toBe(500_000_000);
+  });
+
   it("lists public companies receiving program funds", async () => {
     const { confirmed, possible } = await programs.getProgramCompanies("chips-act", realtime);
     expect(confirmed).toMatchObject([{ cik: MU, ticker: "MU", total: 500_000_000, awards: 1 }]);
@@ -81,7 +127,8 @@ describe.skipIf(!url)("company and program data (integration)", async () => {
     expect(summary).toMatchObject({ total: 500_000_000, publicTotal: 500_000_000, awardCount: 1, recipientCount: 1 });
     const [largest] = await programs.getProgramLargestAwards("chips-act", realtime);
     expect(largest).toMatchObject({ ticker: "MU", sourceUrl: expect.stringMatching(/^https:\/\/www\.usaspending\.gov\/award\//) });
-    expect((await programs.listPrograms(realtime)).find((p) => p.slug === "chips-act")).toMatchObject({ publicCompanies: 1 });
+    await rollupSummaries({ log: silent });
+    expect((await programs.listPrograms("pro")).find((p) => p.slug === "chips-act")).toMatchObject({ publicCompanies: 1, total: "500000000" });
   });
 
   it("finds companies by any share-class ticker", async () => {

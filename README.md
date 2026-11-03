@@ -96,6 +96,16 @@ Decisions are audit-logged, apply to a parent's subsidiaries, and are never over
   quarter-to-date totals with year-over-year change, monthly chart, top agencies, award-type mix,
   largest recent awards with source links, linked recipients, and, when a price provider is
   configured, the stock price with awards ≥ $10M marked.
+- **Sector themes** (`src/config/themes.ts`): Space, AI, Health & biotech, Hypersonics, Drones,
+  Shipbuilding, Munitions & missiles, Cybersecurity, Nuclear, Critical minerals, Batteries & EVs,
+  Clean energy, Cannabis, Quantum. Each matches contracts and grants by agency, NAICS/PSC code
+  prefixes and whole-word keywords (with exclusions) and says on its page that it is a rule match.
+  Add or tune one, then run `pnpm ingest tag-programs`.
+- `/grant-programs`, `/grant-programs/[number]`: every official federal assistance program
+  (Assistance Listing) that has paid out money, with per-plan totals precomputed by the
+  `rollup_summaries` step of `tag-programs` and the daily job.
+- **Announced, not yet awarded** (`src/config/commitments.ts`): curated letters of intent and
+  preliminary terms, shown on program and company pages and never counted in totals.
 - `/programs`, `/program/[slug]`: program totals, public companies receiving funds (confirmed, then
   labeled possible matches), monthly chart, largest awards with source links.
 

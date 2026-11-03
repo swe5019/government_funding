@@ -1,3 +1,5 @@
+import { themes } from "./themes";
+
 /**
  * Funding programs with their own pages. Add a program here, then run
  * `pnpm ingest tag-programs`. An award belongs to a program if it matches ANY listed rule
@@ -10,10 +12,22 @@ export interface ProgramRules {
   assistanceListings?: string[];
   /** Disaster/emergency fund codes (DEFC) on the award. */
   defCodes?: string[];
+  /** Every award from these awarding agencies (toptier codes), e.g. NASA for Space. */
+  allFromAgencies?: string[];
+  /** NAICS industry code prefixes, e.g. "336414" or "3254". */
+  naicsPrefixes?: string[];
+  /** Product/service code (PSC) prefixes, e.g. "AR" (space R&D) or "18" (space vehicles). */
+  pscPrefixes?: string[];
   /** Restricts keyword matching to these awarding agencies (toptier codes). */
   agencyCodes?: string[];
-  /** Case-insensitive phrases matched in the award description (only with agencyCodes). */
+  /**
+   * Case-insensitive phrases matched at the start of a word in the award description (only with
+   * agencyCodes): "uas" matches "UAS" and "sUAS"-free text like "UAS training", not "persuasive".
+   * A phrase may be a word stem ("quantum comput" matches computing/computer).
+   */
   keywords?: string[];
+  /** Awards whose description contains any of these (word-start, like keywords) are left out. */
+  excludeKeywords?: string[];
 }
 
 /** Federal Register search for rules and notices about the program. */
@@ -26,6 +40,8 @@ export interface FederalRegisterQuery {
 
 export interface ProgramConfig {
   slug: string;
+  /** "program": a law or official program. "theme": an investing sector matched by rules. */
+  kind: "program" | "theme";
   name: string;
   description: string;
   sourceUrl: string;
@@ -33,9 +49,11 @@ export interface ProgramConfig {
   federalRegister?: FederalRegisterQuery;
 }
 
-export const programs: ProgramConfig[] = [
+/** Laws and named programs. Sector themes live in ./themes.ts. */
+const official: ProgramConfig[] = [
   {
     slug: "chips-act",
+    kind: "program",
     name: "CHIPS Act incentives",
     description:
       "Federal financial assistance under the CHIPS and Science Act's CHIPS Incentives Program (Assistance Listing 11.037), run by the CHIPS Program Office at NIST, for building and expanding U.S. semiconductor fabrication, materials and equipment facilities.",
@@ -45,6 +63,7 @@ export const programs: ProgramConfig[] = [
   },
   {
     slug: "quantum",
+    kind: "theme",
     name: "Quantum technology",
     description:
       "Federal contracts and grants whose descriptions mention quantum computing, quantum information science, quantum sensing or networking, or qubits, from the agencies that fund most U.S. quantum work (DOE, NSF, DoD including DARPA and the service labs, Commerce/NIST and NASA). This is a keyword match on award descriptions, not an official program: it can include unrelated awards and miss awards with vague descriptions. Much quantum funding goes to universities and national labs, which count in the totals but are not public companies.",
@@ -78,3 +97,5 @@ export const programs: ProgramConfig[] = [
     federalRegister: { terms: ['"National Quantum Initiative"', '"quantum information science"'] },
   },
 ];
+
+export const programs: ProgramConfig[] = [...official, ...themes];

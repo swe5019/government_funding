@@ -43,6 +43,11 @@ export async function upsertBatch(
     byModified,
   );
   const awards = dedupe(rows.map((r) => r.award), (a) => a.id, byModified);
+  const listings = dedupe(
+    awards.flatMap((a) => (a.assistanceListing ? [{ number: a.assistanceListing, title: a.assistanceListingTitle }] : [])),
+    (l) => l.number,
+    (a, b) => Boolean(a.title) && !b.title,
+  );
   const txs = dedupe(rows.map((r) => r.transaction), (t) => t.id, byModified);
 
   await client.query("BEGIN");
@@ -54,6 +59,16 @@ export async function upsertBatch(
          ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, "updatedAt" = now()
          WHERE "Agency".name IS DISTINCT FROM EXCLUDED.name`,
         [col(agencies, (a) => a.code), col(agencies, (a) => a.name)],
+      );
+    }
+    if (listings.length) {
+      // A blank title never overwrites a known one.
+      await client.query(
+        `INSERT INTO "AssistanceListing" (number, title, "updatedAt")
+         SELECT n, t, now() FROM unnest($1::text[], $2::text[]) AS u(n, t)
+         ON CONFLICT (number) DO UPDATE SET title = EXCLUDED.title, "updatedAt" = now()
+         WHERE EXCLUDED.title IS NOT NULL AND "AssistanceListing".title IS DISTINCT FROM EXCLUDED.title`,
+        [col(listings, (l) => l.number), col(listings, (l) => l.title)],
       );
     }
     if (subs.length) {

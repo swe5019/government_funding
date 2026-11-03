@@ -62,18 +62,33 @@ describe("market data", () => {
 describe("rulesToSql", () => {
   it("ORs rules with numbered params", () => {
     const r = rulesToSql({ assistanceListings: ["11.037"], defCodes: ["Z"] }, 2);
-    expect(r.sql).toBe(`a."assistanceListing" = ANY($2::text[]) OR a."defCodes" && $3::text[]`);
+    expect(r.sql).toBe(`(a."assistanceListing" = ANY($2::text[]) OR a."defCodes" && $3::text[])`);
     expect(r.params).toEqual([["11.037"], ["Z"]]);
   });
 
-  it("scopes keywords to agencies and escapes LIKE wildcards", () => {
-    const r = rulesToSql({ keywords: ["50% off_"], agencyCodes: ["089"] });
-    expect(r.sql).toContain(`a."awardingAgencyCode" = ANY($1::text[]) AND a.description ILIKE ANY($2::text[])`);
-    expect(r.params[1]).toEqual(["%50\\% off\\_%"]);
+  it("matches agencies, industry-code prefixes, scoped word-start keywords, minus exclusions", () => {
+    const r = rulesToSql({
+      allFromAgencies: ["080"],
+      naicsPrefixes: ["3364_"],
+      pscPrefixes: ["AR"],
+      agencyCodes: ["097"],
+      keywords: ["uas", "c-uas (small)"],
+      excludeKeywords: ["uasi"],
+    });
+    expect(r.sql).toBe(
+      `(a."awardingAgencyCode" = ANY($1::text[]) OR a."naicsCode" LIKE ANY($2::text[]) OR a."pscCode" LIKE ANY($3::text[]) OR ` +
+        `(a."awardingAgencyCode" = ANY($4::text[]) AND a.description ~* $5)) AND NOT COALESCE(a.description ~* $6, false)`,
+    );
+    expect(r.params).toEqual([["080"], ["3364\\_%"], ["AR%"], ["097"], "\\m(uas|c-uas\\s+\\(small\\))", "\\m(uasi)"]);
   });
 
   it("every configured program has valid rules, and no keyword is a bare 'quantum'", () => {
     for (const prog of programs) expect(() => rulesToSql(prog.rules)).not.toThrow();
+    // Themes are rule matches, not official programs, and must say so.
+    for (const t of programs.filter((p) => p.kind === "theme")) expect(t.description).toMatch(/not an official program/);
+    expect(programs.filter((p) => p.kind === "theme").map((p) => p.slug)).toEqual(
+      expect.arrayContaining(["space", "ai", "health-biotech", "drones", "nuclear", "critical-minerals", "cannabis", "quantum"]),
+    );
     expect(new Set(programs.map((p) => p.slug)).size).toBe(programs.length);
     const quantum = programs.find((p) => p.slug === "quantum")!;
     expect(quantum.rules.keywords).not.toContain("quantum");
