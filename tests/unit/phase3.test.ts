@@ -73,13 +73,21 @@ describe("rulesToSql", () => {
       pscPrefixes: ["AR"],
       agencyCodes: ["097"],
       keywords: ["uas", "c-uas (small)"],
+      wholeWords: ["ai"],
       excludeKeywords: ["uasi"],
     });
     expect(r.sql).toBe(
       `(a."awardingAgencyCode" = ANY($1::text[]) OR a."naicsCode" LIKE ANY($2::text[]) OR a."pscCode" LIKE ANY($3::text[]) OR ` +
-        `(a."awardingAgencyCode" = ANY($4::text[]) AND a.description ~* $5)) AND NOT COALESCE(a.description ~* $6, false)`,
+        `(a."awardingAgencyCode" = ANY($6::text[]) AND (a.description ~* $4 OR a.description ~* $5))) AND NOT COALESCE(a.description ~* $7, false)`,
     );
-    expect(r.params).toEqual([["080"], ["3364\\_%"], ["AR%"], ["097"], "\\m(uas|c-uas\\s+\\(small\\))", "\\m(uasi)"]);
+    expect(r.params).toEqual([["080"], ["3364\\_%"], ["AR%"], "\\m(uas|c-uas\\s+\\(small\\))", "\\m(ai)\\M", ["097"], "\\m(uasi)"]);
+  });
+
+  it("recipient tickers select awards to confirmed matches of those companies", () => {
+    const r = rulesToSql({ recipientTickers: ["PLTR"] });
+    expect(r.sql).toContain(`a."recipientId" IN (SELECT tm."recipientId" FROM "TickerMatch" tm`);
+    expect(r.sql).toContain(`c.ticker = ANY($1::text[]) OR c.tickers && $1::text[]`);
+    expect(r.params).toEqual([["PLTR"]]);
   });
 
   it("every configured program has valid rules, and no keyword is a bare 'quantum'", () => {

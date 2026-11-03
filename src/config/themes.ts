@@ -48,7 +48,7 @@ export const themes: ProgramConfig[] = [
     slug: "ai",
     kind: "theme",
     name: "Artificial intelligence",
-    description: `Contracts and grants whose descriptions mention artificial intelligence, machine learning, large language models, computer vision or related methods, from the agencies that buy and fund most AI work. ${caveat}`,
+    description: `Contracts and grants that mention artificial intelligence, AI, machine learning, large language models, agentic or generative AI, computer vision or named AI systems such as Maven Smart System, from the agencies that buy and fund most AI work, plus every award to AI-focused public companies (Palantir, BigBear.ai, C3.ai). Many large AI deals are "other transaction" agreements that USAspending often does not show; see Announced deals below. ${caveat}`,
     sourceUrl: "https://www.ai.gov",
     rules: {
       agencyCodes: [A.DOD, A.DOE, A.NSF, A.HHS, A.COMMERCE, A.DHS, A.VA, A.GSA, A.TREASURY, A.NASA, A.DOJ, A.STATE],
@@ -59,9 +59,16 @@ export const themes: ProgramConfig[] = [
         "neural network",
         "large language model",
         "generative ai",
+        "agentic",
+        "frontier ai",
         "computer vision",
         "natural language processing",
+        "maven smart system",
+        "project maven",
       ],
+      // Whole words only: "ai" must not match "air" or "aid".
+      wholeWords: ["ai", "genai", "llm", "llms", "ai/ml"],
+      recipientTickers: ["PLTR", "BBAI", "AI"],
     },
   },
   {

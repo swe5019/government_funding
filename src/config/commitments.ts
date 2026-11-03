@@ -1,17 +1,19 @@
 /**
- * Announced federal funding that is not yet in USAspending: letters of intent and preliminary
- * terms that no agency has obligated yet. Entered by hand from official announcements; shown
- * on program and company pages, labeled as not yet awarded, and never added to award totals.
+ * Announced federal deals that the award data doesn't show: letters of intent and preliminary
+ * terms nobody has obligated yet, and announced contract ceilings (often "other transaction"
+ * agreements that USAspending omits, or umbrella agreements whose orders trickle in). Entered by
+ * hand from announcements; shown on program and company pages and never added to award totals.
  *
- * When an entry's money is obligated it appears in USAspending (and so in the award data);
- * then set its stage to "awarded" or remove it. Verify each figure against the official source.
+ * When an entry's money shows up in USAspending, set its stage to "awarded" (hidden) or remove
+ * it. Verify each figure against the source.
  */
-export type CommitmentStage = "letter_of_intent" | "preliminary_terms" | "awarded";
+export type CommitmentStage = "letter_of_intent" | "preliminary_terms" | "ceiling" | "awarded";
 
 export interface CommitmentRecipient {
   name: string;
   /** Primary ticker when publicly traded; null for private companies. */
   ticker: string | null;
+  /** Proposed amount, or the maximum for a "ceiling" entry. */
   amountUsd: number;
   /** Purpose or terms worth showing (e.g. what the money is for). */
   detail?: string;
@@ -40,6 +42,7 @@ export interface Commitment {
 export const STAGE_LABELS: Record<CommitmentStage, string> = {
   letter_of_intent: "Letter of intent",
   preliminary_terms: "Preliminary terms",
+  ceiling: "Contract ceiling announced",
   awarded: "Awarded",
 };
 
@@ -66,5 +69,49 @@ export const commitments: Commitment[] = [
       { name: "PsiQuantum", ticker: null, amountUsd: 100_000_000, equityStake: true },
       { name: "Diraq", ticker: null, amountUsd: 38_000_000, equityStake: true },
     ],
+  },
+  {
+    id: "dod-cdao-frontier-ai-2025",
+    date: "2025-07-14",
+    title: "Pentagon frontier AI agreements: up to $200 million each with four AI companies",
+    agency: "U.S. Department of Defense (Chief Digital and AI Office)",
+    stage: "ceiling",
+    programs: ["ai"],
+    sourceUrl: "https://breakingdefense.com/2025/07/anthropic-google-and-xai-win-200m-each-from-pentagon-ai-chief-for-agentic-ai/",
+    sourceLabel: "Breaking Defense",
+    note: "Agreements to develop agentic AI for national security, each with a ceiling of $200 million (OpenAI's was announced in June 2025, the other three on July 14, 2025). These are other transaction agreements, which USAspending often does not show; only a fraction of the ceilings has been obligated.",
+    verifiedAt: "2026-11-03",
+    recipients: [
+      { name: "Google (Alphabet)", ticker: "GOOGL", amountUsd: 200_000_000, detail: "Ceiling; agentic AI workflows" },
+      { name: "OpenAI", ticker: null, amountUsd: 200_000_000, detail: "Ceiling" },
+      { name: "Anthropic", ticker: null, amountUsd: 200_000_000, detail: "Ceiling" },
+      { name: "xAI", ticker: null, amountUsd: 200_000_000, detail: "Ceiling" },
+    ],
+  },
+  {
+    id: "army-palantir-enterprise-2025",
+    date: "2025-07-31",
+    title: "Army enterprise agreement with Palantir: up to $10 billion over 10 years",
+    agency: "U.S. Army",
+    stage: "ceiling",
+    programs: ["ai"],
+    sourceUrl: "https://www.theregister.com/2025/08/01/palantir_us_army_contract/",
+    sourceLabel: "The Register",
+    note: "A 10-year enterprise agreement consolidating 75 existing Army contracts for Palantir software and data platforms, with a ceiling of $10 billion. Orders under it are placed over time; the ceiling is a maximum, not money committed.",
+    verifiedAt: "2026-11-03",
+    recipients: [{ name: "Palantir Technologies", ticker: "PLTR", amountUsd: 10_000_000_000, detail: "Ceiling; consolidates 75 contracts" }],
+  },
+  {
+    id: "dod-maven-ceiling-2025",
+    date: "2025-05-21",
+    title: "Maven Smart System contract ceiling raised by $795 million",
+    agency: "U.S. Department of Defense",
+    stage: "ceiling",
+    programs: ["ai"],
+    sourceUrl: "https://seekingalpha.com/news/4451323-palantir-awarded-795m-u-s-army-contract-modification",
+    sourceLabel: "Seeking Alpha",
+    note: "Contract modification raising the ceiling of Palantir's Maven Smart System (AI targeting and decision support) by $795 million, for expected demand from combatant commands through May 2029.",
+    verifiedAt: "2026-11-03",
+    recipients: [{ name: "Palantir Technologies", ticker: "PLTR", amountUsd: 795_000_000, detail: "Ceiling increase" }],
   },
 ];
