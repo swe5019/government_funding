@@ -240,6 +240,48 @@ model Award {
   @@index([defCodes], type: Gin)
 }
 
+/// Per-plan headline totals for the programs and themes list, rebuilt after tagging and matching.
+model ProgramSummary {
+  programSlug     String
+  plan            String
+  total           Decimal  @db.Decimal(20, 2)
+  publicCompanies Int
+  program         Program  @relation(fields: [programSlug], references: [slug], onDelete: Cascade)
+
+  @@id([programSlug, plan])
+}
+
+/// An official federal assistance program (SAM.gov Assistance Listing, formerly CFDA), as named
+/// on the awards that reference it. Filled during USAspending loads.
+model AssistanceListing {
+  /// e.g. "11.037"
+  number    String                     @id
+  title     String?
+  updatedAt DateTime                   @updatedAt @db.Timestamptz
+  summaries AssistanceListingSummary[]
+
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "AssistanceListing_title_trgm_idx")
+}
+
+/// Per-plan totals for the grant program directory, rebuilt by the rollup-listings job.
+/// plan = key in src/config/plans.ts; each row applies that plan's data window.
+model AssistanceListingSummary {
+  number          String
+  plan            String
+  total           Decimal           @db.Decimal(20, 2)
+  publicTotal     Decimal           @db.Decimal(20, 2)
+  awards          Int
+  recipients      Int
+  publicCompanies Int
+  latestAction    DateTime?         @db.Date
+  /// Awarding agency on most of the program's transactions
+  agencyCode      String?
+  listing         AssistanceListing @relation(fields: [number], references: [number], onDelete: Cascade)
+
+  @@id([number, plan])
+  @@index([plan, total])
+}
+
 /// One obligation action (base award or modification). Period totals are summed from here.
 model AwardTransaction {
   /// USAspending contract_transaction_unique_key / assistance_transaction_unique_key
@@ -276,6 +318,7 @@ model Program {
   updatedAt   DateTime             @updatedAt @db.Timestamptz
   awards      AwardProgram[]
   fedRegDocs  FederalRegisterDoc[]
+  summaries   ProgramSummary[]
 }
 
 model AwardProgram {

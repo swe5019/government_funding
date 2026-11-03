@@ -1,7 +1,19 @@
 import { siteConfig } from "@/config/site";
 import { expect, expectAccessible, test } from "./fixtures";
 
-const PAGES = ["/", "/search?q=lockheed", "/company/LMT", "/programs", "/program/chips-act", "/pricing", "/signin", "/disclaimer"];
+const PAGES = [
+  "/",
+  "/search?q=lockheed",
+  "/company/LMT",
+  "/programs",
+  "/program/chips-act",
+  "/program/space",
+  "/grant-programs",
+  "/grant-programs/11.037",
+  "/pricing",
+  "/signin",
+  "/disclaimer",
+];
 
 for (const path of PAGES) {
   test(`${path} renders with the disclaimer and passes axe`, async ({ page }) => {
@@ -72,4 +84,21 @@ test("announced commitments show on the program page and the named company's pag
   await expect(onCompany.getByRole("cell", { name: "Quantinuum" })).toBeVisible();
   await expect(onCompany.getByRole("cell", { name: "IBM" })).toHaveCount(0);
   await expectAccessible(page);
+});
+
+test("programs page groups sector themes and links every federal grant program", async ({ page }) => {
+  await page.goto("/programs");
+  await expect(page.getByRole("heading", { name: "Sector themes" })).toBeVisible();
+  for (const name of ["Space", "Artificial intelligence", "Health & biotech", "Cannabis", "Nuclear energy"]) {
+    await expect(page.getByRole("link", { name, exact: true })).toBeVisible();
+  }
+  await page.getByRole("link", { name: /All \d+ official grant programs/ }).click();
+  await expect(page).toHaveURL(/\/grant-programs$/);
+  await page.getByLabel("Search grant programs").fill("chips");
+  await page.getByRole("button", { name: "Search" }).click();
+  await expect(page.getByRole("link", { name: "CHIPS Incentives Program" })).toBeVisible();
+  await page.getByRole("link", { name: "CHIPS Incentives Program" }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("CHIPS Incentives Program");
+  await expect(page.getByRole("link", { name: /MU/ }).first()).toBeVisible();
+  await expect(page.getByText(/Last updated/).first()).toBeVisible();
 });

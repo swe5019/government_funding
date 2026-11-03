@@ -53,6 +53,8 @@ export interface ParsedTransaction {
     naicsCode: string | null;
     pscCode: string | null;
     assistanceListing: string | null;
+    /** Program name as printed on the award; stored in AssistanceListing, not on Award. */
+    assistanceListingTitle: string | null;
     defCodes: string[];
     totalObligated: string;
     potentialValue: string | null;
@@ -257,6 +259,7 @@ export function parseRow(kind: FileKind, row: RawRow): ParsedTransaction {
       naicsCode: pick(row, "naics_code"),
       pscCode: pick(row, "product_or_service_code"),
       assistanceListing: pick(row, "assistance_listing_number", "cfda_number"),
+      assistanceListingTitle: pick(row, "assistance_listing_title", "cfda_title"),
       defCodes,
       totalObligated,
       potentialValue: toMoney(

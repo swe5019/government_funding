@@ -10,6 +10,7 @@ import { matchTickers } from "@/jobs/match-tickers";
 import { syncPrices } from "@/jobs/prices";
 import { rollupRecipients } from "@/jobs/rollup";
 import { rollupCompanies } from "@/jobs/rollup-companies";
+import { rollupSummaries } from "@/jobs/rollup-summaries";
 import { closeJobPool, withJobLock } from "@/jobs/runner";
 import { samOpportunities } from "@/jobs/sam-opportunities";
 import { samParents } from "@/jobs/sam-parents";
@@ -41,7 +42,8 @@ Jobs:
   match-tickers          Match recipients to public companies, then roll up company totals
       --full               re-match every eligible recipient
   rollup-companies       Rebuild company totals from current matches
-  tag-programs           Sync programs from src/config/programs.ts and re-tag their awards
+  tag-programs           Sync programs and themes (src/config/programs.ts, themes.ts), re-tag their
+                         awards, and rebuild the grant program directory totals
   prices                 Fetch daily stock bars for linked companies (needs MARKET_DATA_PROVIDER)
   alerts                 Email watchlist alerts for newly published awards (Pro)
   dod-announcements      defense.gov daily contract announcements (RSS)
@@ -91,7 +93,7 @@ async function main() {
         }),
       );
       await withJobLock("rollup", () => rollupRecipients());
-      await withJobLock("programs", () => tagPrograms());
+      await withJobLock("programs", () => tagPrograms().then(() => rollupSummaries()));
       break;
     case "usaspending-daily":
       await syncAgencies();
@@ -99,6 +101,8 @@ async function main() {
       await withJobLock("rollup", () => rollupRecipients());
       await withJobLock("programs", () => tagPrograms());
       await withJobLock("mapping", () => matchAndRollup(false));
+      // After matching, so the directory's public-company totals reflect today's links.
+      await withJobLock("programs", () => rollupSummaries());
       await withJobLock("prices", () => syncPrices());
       // Secondary sources: a failure in one is logged and doesn't stop the others or alerts.
       await soft("dod-announcements", () => withJobLock("dod", () => dodAnnouncements()));
@@ -131,7 +135,7 @@ async function main() {
       await withJobLock("mapping", () => rollupCompanies());
       break;
     case "tag-programs":
-      await withJobLock("programs", () => tagPrograms());
+      await withJobLock("programs", () => tagPrograms().then(() => rollupSummaries()));
       break;
     case "prices":
       await withJobLock("prices", () => syncPrices({ limit }));

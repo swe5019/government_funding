@@ -4,6 +4,7 @@ import { matchTickers } from "@/jobs/match-tickers";
 import { rollupRecipients } from "@/jobs/rollup";
 import { rollupCompanies } from "@/jobs/rollup-companies";
 import { closeJobPool, jobPool } from "@/jobs/runner";
+import { rollupSummaries } from "@/jobs/rollup-summaries";
 import { tagPrograms } from "@/jobs/tag-programs";
 import { usaspendingLoadLocal } from "@/jobs/usaspending";
 import { E2E_USERS } from "./users";
@@ -33,6 +34,7 @@ async function main() {
   await tagPrograms({ log: silent });
   await matchTickers({ full: true, log: silent });
   await rollupCompanies({ log: silent });
+  await rollupSummaries({ log: silent });
 
   // A company named in an announced commitment (src/config/commitments.ts), for linking.
   await q(`INSERT INTO "Company" (cik, ticker, tickers, name, "isMajorExchange", "updatedAt")
