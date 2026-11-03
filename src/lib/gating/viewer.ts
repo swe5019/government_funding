@@ -48,7 +48,9 @@ export async function getViewer(): Promise<Viewer> {
   if (!id) return ANONYMOUS;
   const user = await prisma.user.findUnique({ where: { id }, include: { subscription: true } });
   if (!user) return ANONYMOUS;
-  const plan = planFor(user.subscription);
+  const isAdmin = user.role === "ADMIN";
+  // Admins run the site and review data, so they always see everything Pro sees.
+  const plan = isAdmin ? "pro" : planFor(user.subscription);
   return {
     userId: user.id,
     user: {
@@ -59,7 +61,7 @@ export async function getViewer(): Promise<Viewer> {
       trialUsedAt: user.trialUsedAt,
       stripeCustomerId: user.stripeCustomerId,
     },
-    isAdmin: user.role === "ADMIN",
+    isAdmin,
     plan,
     entitlements: plans[plan].entitlements,
     subscription: user.subscription

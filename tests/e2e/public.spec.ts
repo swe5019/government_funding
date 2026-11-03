@@ -73,14 +73,14 @@ test("security headers are set", async ({ request }) => {
 
 test("announced commitments show on the program page and the named company's page, outside the totals", async ({ page }) => {
   await page.goto("/program/quantum");
-  const section = page.locator("section", { has: page.getByRole("heading", { name: "Announced, not yet awarded" }) });
+  const section = page.locator("section", { has: page.getByRole("heading", { name: "Announced deals not in the award data" }) });
   await expect(section).toBeVisible();
   await expect(section.getByText("Letter of intent")).toBeVisible();
   await expect(section.getByRole("cell", { name: "PsiQuantum" })).toBeVisible();
   await expect(section.getByText("$2,013,000,000")).toBeVisible();
   await section.getByRole("link", { name: "QNT" }).click();
   await expect(page).toHaveURL(/\/company\/QNT$/);
-  const onCompany = page.locator("section", { has: page.getByRole("heading", { name: "Announced, not yet awarded" }) });
+  const onCompany = page.locator("section", { has: page.getByRole("heading", { name: "Announced deals not in the award data" }) });
   await expect(onCompany.getByRole("cell", { name: "Quantinuum" })).toBeVisible();
   await expect(onCompany.getByRole("cell", { name: "IBM" })).toHaveCount(0);
   await expectAccessible(page);
@@ -101,4 +101,14 @@ test("programs page groups sector themes and links every federal grant program",
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("CHIPS Incentives Program");
   await expect(page.getByRole("link", { name: /MU/ }).first()).toBeVisible();
   await expect(page.getByText(/Last updated/).first()).toBeVisible();
+});
+
+test("AI theme lists announced AI deals the award data misses, with ceilings kept out of totals", async ({ page }) => {
+  await page.goto("/program/ai");
+  const section = page.locator("section", { has: page.getByRole("heading", { name: "Announced deals not in the award data" }) });
+  await expect(section.getByText("Contract ceiling announced").first()).toBeVisible();
+  await expect(section.getByRole("cell", { name: "Palantir Technologies" }).first()).toBeVisible();
+  await expect(section.getByRole("cell", { name: "Google (Alphabet)" })).toBeVisible();
+  // Full amount on desktop, compact ("$10B") on phones.
+  await expect(section.getByText(/^\$10(,000,000,000|(\.0)?B)$/).filter({ visible: true }).first()).toBeVisible();
 });

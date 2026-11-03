@@ -89,6 +89,8 @@ describe.skipIf(!url)("company and program data (integration)", async () => {
     await award("T_NASA", "080", "WIND TUNNEL MAINTENANCE");
     await award("T_SATNAICS", "097", "SPARES", "336414");
     await award("T_SATOFFICE", "097", "LEASE OF SATELLITE OFFICE SPACE");
+    await award("T_AI", "097", "AI-ENABLED TARGET RECOGNITION");
+    await award("T_AIR", "097", "AIR FORCE BASE FACILITY SUPPORT AND AID STATION");
     await tagPrograms({ log: silent });
     const tagged = async (slug: string) =>
       (await q<{ awardId: string }>(`SELECT "awardId" FROM "AwardProgram" WHERE "programSlug" = $1 AND "awardId" LIKE 'T\\_%' ORDER BY 1`, [slug])).map(
@@ -96,6 +98,18 @@ describe.skipIf(!url)("company and program data (integration)", async () => {
       );
     expect(await tagged("drones")).toEqual(["T_UAS"]);
     expect(await tagged("space")).toEqual(["T_NASA", "T_SATNAICS"]);
+    expect(await tagged("ai")).toEqual(["T_AI"]);
+    // Every award to a confirmed match of a listed ticker (LMT recipients in the fixtures).
+    const { rulesToSql } = await import("@/lib/programs/rules");
+    const { sql, params } = rulesToSql({ recipientTickers: ["LMT"] });
+    const lmt = await q<{ id: string }>(`SELECT a.id FROM "Award" a WHERE ${sql} ORDER BY 1`, params);
+    expect(lmt.length).toBeGreaterThan(0);
+    const recipients = await q<{ n: number }>(
+      `SELECT count(DISTINCT c.ticker)::int AS n FROM "Award" a JOIN "TickerMatch" tm ON tm."recipientId" = a."recipientId"
+       JOIN "Company" c ON c.cik = tm."companyCik" WHERE a.id = ANY($1::text[])`,
+      [lmt.map((r) => r.id)],
+    );
+    expect(recipients[0].n).toBe(1);
     await q(`DELETE FROM "Award" WHERE id LIKE 'T\\_%'`);
     await tagPrograms({ log: silent });
   });

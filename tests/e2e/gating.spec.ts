@@ -83,6 +83,12 @@ test.describe("Pro user", () => {
 test.describe("admin", () => {
   test.beforeEach(async ({ signInAs }) => signInAs("admin"));
 
+  test("admins see Pro data (no free-tier delay)", async ({ page }) => {
+    await page.goto("/company/LMT");
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("LMT");
+    await expect(page.getByRole("link", { name: "Get daily updates with Pro" })).toHaveCount(0);
+  });
+
   test("users page lists sign-ups with totals", async ({ page }) => {
     const res = await page.goto("/admin/users");
     expect(res?.status()).toBe(200);

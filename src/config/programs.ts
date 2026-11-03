@@ -26,6 +26,16 @@ export interface ProgramRules {
    * A phrase may be a word stem ("quantum comput" matches computing/computer).
    */
   keywords?: string[];
+  /**
+   * Like keywords (same agencyCodes scope) but matched as whole words only, for short terms
+   * that would otherwise hit longer words: "ai" matches "AI" and "AI-enabled", not "air" or "aid".
+   */
+  wholeWords?: string[];
+  /**
+   * Every award to recipients confirmed as these companies (primary or share-class tickers), for
+   * pure-play companies whose whole federal business belongs in the theme.
+   */
+  recipientTickers?: string[];
   /** Awards whose description contains any of these (word-start, like keywords) are left out. */
   excludeKeywords?: string[];
 }

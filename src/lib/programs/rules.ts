@@ -1,4 +1,5 @@
 import type { ProgramRules } from "@/config/programs";
+import { CONFIRMED_SQL } from "@/lib/mapping/sql";
 
 const REGEX_SPECIAL = /[\\^$.*+?()[\]{}|]/g;
 
@@ -7,9 +8,16 @@ const REGEX_SPECIAL = /[\\^$.*+?()[\]{}|]/g;
  * Whitespace inside a phrase matches any run of whitespace.
  */
 export function wordStartPattern(phrases: string[]): string {
-  const alts = phrases.map((p) => p.trim().replace(REGEX_SPECIAL, "\\$&").replace(/\s+/g, "\\s+"));
-  return `\\m(${alts.join("|")})`;
+  return `\\m(${alternatives(phrases)})`;
 }
+
+/** Like wordStartPattern, but the phrase must also end at a word boundary. */
+export function wholeWordPattern(words: string[]): string {
+  return `\\m(${alternatives(words)})\\M`;
+}
+
+const alternatives = (phrases: string[]) =>
+  phrases.map((p) => p.trim().replace(REGEX_SPECIAL, "\\$&").replace(/\s+/g, "\\s+")).join("|");
 
 /**
  * Build a SQL predicate over "Award" a for a program's rules. Returns the WHERE fragment and
@@ -30,10 +38,20 @@ export function rulesToSql(rules: ProgramRules, firstParam = 1): { sql: string; 
   if (rules.allFromAgencies?.length) parts.push(`a."awardingAgencyCode" = ANY(${p(rules.allFromAgencies)}::text[])`);
   if (rules.naicsPrefixes?.length) parts.push(`a."naicsCode" LIKE ANY(${p(prefixes(rules.naicsPrefixes))}::text[])`);
   if (rules.pscPrefixes?.length) parts.push(`a."pscCode" LIKE ANY(${p(prefixes(rules.pscPrefixes))}::text[])`);
-  if (rules.keywords?.length) {
+  if (rules.keywords?.length || rules.wholeWords?.length) {
     if (!rules.agencyCodes?.length) throw new Error("keyword rules need agencyCodes");
+    const text = [
+      ...(rules.keywords?.length ? [`a.description ~* ${p(wordStartPattern(rules.keywords))}`] : []),
+      ...(rules.wholeWords?.length ? [`a.description ~* ${p(wholeWordPattern(rules.wholeWords))}`] : []),
+    ];
+    const agencies = p(rules.agencyCodes);
+    parts.push(`(a."awardingAgencyCode" = ANY(${agencies}::text[]) AND (${text.join(" OR ")}))`);
+  }
+  if (rules.recipientTickers?.length) {
+    const tickers = p(rules.recipientTickers);
     parts.push(
-      `(a."awardingAgencyCode" = ANY(${p(rules.agencyCodes)}::text[]) AND a.description ~* ${p(wordStartPattern(rules.keywords))})`,
+      `a."recipientId" IN (SELECT tm."recipientId" FROM "TickerMatch" tm JOIN "Company" c ON c.cik = tm."companyCik"
+        WHERE ${CONFIRMED_SQL} AND (c.ticker = ANY(${tickers}::text[]) OR c.tickers && ${tickers}::text[]))`,
     );
   }
   if (!parts.length) throw new Error("program has no rules");

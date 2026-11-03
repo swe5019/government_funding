@@ -7,19 +7,20 @@ import { formatDate, formatUsd, formatUsdCompact } from "@/lib/format";
 const h2 = "text-sm font-semibold uppercase tracking-wide text-muted";
 
 /**
- * Official announcements of funding that has not been obligated yet. Kept visually and
- * numerically separate from award data: amounts here are never part of any total.
+ * Announced deals the award data doesn't show (letters of intent, announced contract ceilings).
+ * Kept visually and numerically separate from award data: amounts here are never part of any total.
  */
 export function AnnouncedCommitments({ items, scope }: { items: ResolvedCommitment[]; scope: "program" | "company" }) {
   if (!items.length) return null;
   return (
     <section className="space-y-2" aria-labelledby="announced-heading">
       <h2 id="announced-heading" className={h2}>
-        Announced, not yet awarded
+        Announced deals not in the award data
       </h2>
       <p className="text-xs text-muted">
-        Official announcements of proposed funding. No money has been obligated yet, so these amounts are not in USAspending and
-        are not included in any totals above. Terms can change or fall through before a final award.
+        Letters of intent (proposed funding, not yet committed) and announced contract ceilings (the most a contract can pay,
+        often through agreements USAspending doesn&rsquo;t show). These amounts are not included in any totals above. Terms can
+        change, and ceilings are maximums, not money spent.
       </p>
       {items.map((c) => (
         <article key={c.id} className="space-y-3 rounded-md border border-dashed border-line bg-surface p-4 text-sm">
@@ -38,7 +39,7 @@ export function AnnouncedCommitments({ items, scope }: { items: ResolvedCommitme
                 <tr>
                   <th className="py-1 pr-3 font-medium">Company</th>
                   <th className="py-1 pr-3 font-medium">Ticker</th>
-                  <th className="py-1 pr-3 text-right font-medium">Proposed amount</th>
+                  <th className="py-1 pr-3 text-right font-medium">{c.stage === "ceiling" ? "Ceiling" : "Proposed amount"}</th>
                   <th className="hidden py-1 font-medium sm:table-cell">Terms</th>
                 </tr>
               </thead>
@@ -69,7 +70,7 @@ export function AnnouncedCommitments({ items, scope }: { items: ResolvedCommitme
                 <tfoot className="border-t border-line text-xs text-muted">
                   <tr>
                     <td className="py-1.5 pr-3" colSpan={2}>
-                      Total proposed
+                      {c.stage === "ceiling" ? "Total ceilings" : "Total proposed"}
                     </td>
                     <td className="tabular py-1.5 pr-3 text-right">{formatUsd(c.totalUsd)}</td>
                     <td className="hidden sm:table-cell" />
