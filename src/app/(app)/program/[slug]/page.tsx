@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { AnnouncedCommitments } from "@/components/announced-commitments";
 import { AwardsOverTime } from "@/components/charts/awards-over-time";
 import { DataTableDetails } from "@/components/data-table-details";
 import { LastUpdated } from "@/components/last-updated";
@@ -9,6 +10,7 @@ import { MatchBadge } from "@/components/match-badge";
 import { SourceLink } from "@/components/source-link";
 import { StatTile } from "@/components/stat-tile";
 import { getProgramDocuments } from "@/lib/announcements";
+import { getCommitments } from "@/lib/commitments";
 import { formatDate, formatMonth, formatUsd, formatUsdCompact } from "@/lib/format";
 import { dataWindow } from "@/lib/gating/dataCutoff";
 import { getViewer } from "@/lib/gating/viewer";
@@ -41,11 +43,12 @@ async function Program({ params }: { params: PageProps<"/program/[slug]">["param
   if (!program) notFound();
   const viewer = await getViewer();
   const win = dataWindow(viewer.entitlements);
-  const [summary, companies, largest, documents] = await Promise.all([
+  const [summary, companies, largest, documents, commitments] = await Promise.all([
     getProgramSummary(slug, win),
     getProgramCompanies(slug, win),
     getProgramLargestAwards(slug, win),
     getProgramDocuments(slug),
+    getCommitments({ program: slug }),
   ]);
   const now = new Date();
   const first = summary.monthly[0]?.month ?? win.historyStart ?? now;
@@ -105,6 +108,8 @@ async function Program({ params }: { params: PageProps<"/program/[slug]">["param
           </div>
         </section>
       )}
+
+      <AnnouncedCommitments items={commitments} scope="program" />
 
       {documents.length > 0 && (
         <section className="space-y-2">
