@@ -51,7 +51,12 @@ export async function AwardScopeSections({ scope, win, beforeLargest }: { scope:
 
       <section className="space-y-2">
         <h2 className={h2}>Public companies receiving funds</h2>
-        <CompanyTable rows={companies.confirmed} total={summary.total} />
+        <CompanyTable rows={companies.confirmed.filter((c) => c.total > 0)} total={summary.total} />
+        <AdjustmentsOnly rows={companies.confirmed.filter((c) => c.total <= 0)} />
+        <p className="text-xs text-muted">
+          Net obligated = new awards and increases minus reductions in the period shown. Reductions (de-obligations) are
+          routine: unused money returned when a contract closes out, scope cuts and corrections.
+        </p>
         {companies.possible.length > 0 && (
           <div className="space-y-2 pt-2">
             <h3 className="text-sm font-medium text-warn-fg">Possible matches (unverified)</h3>
@@ -59,7 +64,7 @@ export async function AwardScopeSections({ scope, win, beforeLargest }: { scope:
               These recipients might belong to the listed companies, but the link is below our confidence threshold. They are
               not included in the public-company totals.
             </p>
-            <CompanyTable rows={companies.possible} total={summary.total} possible />
+            <CompanyTable rows={companies.possible.filter((c) => c.total > 0)} total={summary.total} possible />
           </div>
         )}
       </section>
@@ -134,40 +139,73 @@ export async function AwardScopeSections({ scope, win, beforeLargest }: { scope:
 }
 
 function CompanyTable({ rows, total, possible = false }: { rows: ProgramCompany[]; total: number; possible?: boolean }) {
-  if (!rows.length) return <p className="text-sm text-muted">No public company recipients yet.</p>;
+  if (!rows.length) return <p className="text-sm text-muted">No public company recipients with new money in this period yet.</p>;
   return (
     <div className="overflow-x-auto rounded-md border border-line bg-surface">
       <table className="w-full text-sm">
         <thead className="border-b border-line text-left text-xs text-muted">
           <tr>
             <th className="px-4 py-2 font-medium">Company</th>
-            <th className="px-4 py-2 text-right font-medium">Obligated</th>
-            <th className="hidden px-4 py-2 text-right font-medium sm:table-cell">Share of program</th>
-            <th className="hidden px-4 py-2 font-medium sm:table-cell">Latest award</th>
+            <th className="px-4 py-2 text-right font-medium">Net obligated</th>
+            <th className="hidden px-4 py-2 text-right font-medium sm:table-cell">New money</th>
+            <th className="hidden px-4 py-2 text-right font-medium sm:table-cell">Reductions</th>
+            <th className="hidden px-4 py-2 text-right font-medium md:table-cell">Share</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-line">
           {rows.map((c) => (
             <tr key={c.cik}>
               <td className="px-4 py-2">
-                <Link href={`/company/${encodeURIComponent(c.ticker)}`} className="hover:underline">
-                  {possible ? (
-                    <MatchBadge match={{ status: "PENDING", confidence: 0, companyCik: c.cik }} ticker={c.ticker} />
-                  ) : (
-                    <span className="font-mono font-semibold">{c.ticker}</span>
-                  )}{" "}
-                  {c.name}
-                </Link>
+                <CompanyLink c={c} possible={possible} />
+                <div className="text-xs text-muted">Latest award {formatDate(c.latestAction)}</div>
               </td>
               <td className="tabular px-4 py-2 text-right">{formatUsdCompact(c.total)}</td>
-              <td className="tabular hidden px-4 py-2 text-right sm:table-cell">
+              <td className="tabular hidden px-4 py-2 text-right sm:table-cell">{formatUsdCompact(c.added)}</td>
+              <td className="tabular hidden px-4 py-2 text-right text-muted sm:table-cell">{c.reduced < 0 ? formatUsdCompact(c.reduced) : "—"}</td>
+              <td className="tabular hidden px-4 py-2 text-right md:table-cell">
                 {total > 0 ? `${((c.total / total) * 100).toFixed(1)}%` : "—"}
               </td>
-              <td className="hidden px-4 py-2 text-muted sm:table-cell">{formatDate(c.latestAction)}</td>
             </tr>
           ))}
         </tbody>
       </table>
     </div>
+  );
+}
+
+/** Companies whose only activity in the period was reductions or no-cost changes. */
+function AdjustmentsOnly({ rows }: { rows: ProgramCompany[] }) {
+  if (!rows.length) return null;
+  return (
+    <details className="rounded-md border border-line bg-surface px-4 py-2 text-sm">
+      <summary className="cursor-pointer text-muted">
+        {rows.length} {rows.length === 1 ? "company" : "companies"} with only adjustments in this period (no new money)
+      </summary>
+      <p className="mt-2 text-xs text-muted">
+        Their entries here were reductions (for example unused money returned at contract closeout) or no-cost changes such
+        as deadline extensions. This doesn&rsquo;t mean they are losing government business.
+      </p>
+      <ul className="mt-2 divide-y divide-line">
+        {rows.map((c) => (
+          <li key={c.cik} className="flex items-center justify-between gap-3 py-1.5">
+            <CompanyLink c={c} />
+            <span className="tabular text-muted">{c.total === 0 ? "$0 net" : `${formatUsdCompact(c.total)} net`}</span>
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
+function CompanyLink({ c, possible = false }: { c: ProgramCompany; possible?: boolean }) {
+  return (
+    <Link href={`/company/${encodeURIComponent(c.ticker)}`} className="hover:underline">
+      {possible ? (
+        <MatchBadge match={{ status: "PENDING", confidence: 0, companyCik: c.cik }} ticker={c.ticker} />
+      ) : (
+        <span className="font-mono font-semibold">{c.ticker}</span>
+      )}{" "}
+      {c.name}
+    </Link>
   );
 }

@@ -133,9 +133,20 @@ describe.skipIf(!url)("company and program data (integration)", async () => {
     expect((await programs.getProgramSummary({ listing: "11.037" }, realtime)).total).toBe(500_000_000);
   });
 
+  it("company rows split new money from reductions", async () => {
+    await q(`INSERT INTO "Award" (id, category, "recipientId", "assistanceListing", "totalObligated", "lastModifiedDate", "sourceUrl")
+             VALUES ('NEG1', 'GRANT', 'M7XQ1LZ9K2B4', '99.999', -200, '2026-03-01', 'https://www.usaspending.gov/award/NEG1')`);
+    await q(`INSERT INTO "AwardTransaction" (id, "awardId", "actionDate", obligation, "availableAt", "lastModifiedDate")
+             VALUES ('NEG1_0', 'NEG1', '2026-03-01', 100, '2026-03-02', '2026-03-01'),
+                    ('NEG1_1', 'NEG1', '2026-03-05', -300, '2026-03-06', '2026-03-05')`);
+    const { confirmed } = await programs.getProgramCompanies({ listing: "99.999" }, realtime);
+    expect(confirmed).toMatchObject([{ ticker: "MU", total: -200, added: 100, reduced: -300 }]);
+    await q(`DELETE FROM "Award" WHERE id = 'NEG1'`);
+  });
+
   it("lists public companies receiving program funds", async () => {
     const { confirmed, possible } = await programs.getProgramCompanies("chips-act", realtime);
-    expect(confirmed).toMatchObject([{ cik: MU, ticker: "MU", total: 500_000_000, awards: 1 }]);
+    expect(confirmed).toMatchObject([{ cik: MU, ticker: "MU", total: 500_000_000, added: 500_000_000, reduced: 0, awards: 1 }]);
     expect(possible).toEqual([]);
     const summary = await programs.getProgramSummary("chips-act", realtime);
     expect(summary).toMatchObject({ total: 500_000_000, publicTotal: 500_000_000, awardCount: 1, recipientCount: 1 });
