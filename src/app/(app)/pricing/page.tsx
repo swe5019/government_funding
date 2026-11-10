@@ -3,8 +3,10 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { plans, type Entitlements } from "@/config/plans";
 import { DISCLAIMER } from "@/config/site";
+import { billingConfigured } from "@/lib/billing/stripe";
 import { getViewer } from "@/lib/gating/viewer";
-import { startCheckoutAction } from "./actions";
+import { PRICE_ANSWERS } from "@/lib/waitlist";
+import { joinWaitlistAction, startCheckoutAction } from "./actions";
 
 export const metadata: Metadata = {
   title: "Pricing",
@@ -36,12 +38,16 @@ export default function PricingPage({ searchParams }: PageProps<"/pricing">) {
   const monthly = pro.prices.monthly!.amountUsd;
   const annual = pro.prices.annual!.amountUsd;
   const savings = Math.round((1 - annual / (monthly * 12)) * 100);
+  // Until paid plans go on sale, Pro takes waitlist sign-ups (and a price question) instead.
+  const onSale = billingConfigured();
 
   return (
     <div className="space-y-8">
       <header className="space-y-2 text-center">
         <h1 className="text-3xl font-semibold tracking-tight">Pricing</h1>
-        <p className="text-muted">Start with {pro.trialDays} days of Pro free. Cancel anytime.</p>
+        <p className="text-muted">
+          {onSale ? <>Start with {pro.trialDays} days of Pro free. Cancel anytime.</> : <>Pro is coming soon. Join the waitlist to get early access.</>}
+        </p>
       </header>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -67,10 +73,12 @@ export default function PricingPage({ searchParams }: PageProps<"/pricing">) {
           <Suspense fallback={<div className="mt-6 h-10 animate-pulse rounded-md bg-line" />}>
             <ProActions searchParams={searchParams} />
           </Suspense>
-          <p className="mt-3 text-xs text-muted">
-            {pro.trialDays}-day free trial for new subscribers, then {usd(monthly)}/month or {usd(annual)}/year. A card is
-            required; you won&rsquo;t be charged if you cancel before the trial ends.
-          </p>
+          {onSale && (
+            <p className="mt-3 text-xs text-muted">
+              {pro.trialDays}-day free trial for new subscribers, then {usd(monthly)}/month or {usd(annual)}/year. A card is
+              required; you won&rsquo;t be charged if you cancel before the trial ends.
+            </p>
+          )}
         </section>
       </div>
 
@@ -109,6 +117,7 @@ async function ProActions({ searchParams }: { searchParams: PageProps<"/pricing"
       </Link>
     );
   }
+  if (!billingConfigured()) return <WaitlistForm viewerEmail={viewer.user?.email ?? null} sp={sp} />;
   const label = viewer.user?.trialUsedAt ? "Subscribe" : `Start ${plans.pro.trialDays}-day free trial`;
   return (
     <div className="mt-6 space-y-2">
@@ -124,5 +133,45 @@ async function ProActions({ searchParams }: { searchParams: PageProps<"/pricing"
         </form>
       </div>
     </div>
+  );
+}
+
+function WaitlistForm({ viewerEmail, sp }: { viewerEmail: string | null; sp: Awaited<PageProps<"/pricing">["searchParams"]> }) {
+  if (sp.waitlist === "joined") {
+    return (
+      <p id="waitlist" role="status" className="mt-6 rounded-md bg-accent/10 px-3 py-2 text-sm">
+        You&rsquo;re on the Pro waitlist. We&rsquo;ll email you when it opens, with an early-access offer.
+      </p>
+    );
+  }
+  const from = typeof sp.from === "string" ? sp.from : "pricing";
+  return (
+    <form id="waitlist" action={joinWaitlistAction} className="mt-6 space-y-3 text-sm">
+      {sp.waitlist === "invalid" && <p className="text-warn-fg">Please enter a valid email address.</p>}
+      <input type="hidden" name="source" value={from} />
+      <div aria-hidden="true" className="hidden">
+        <label>
+          Website <input name="website" tabIndex={-1} autoComplete="off" />
+        </label>
+      </div>
+      {viewerEmail ? (
+        <p className="text-muted">Joining as {viewerEmail}</p>
+      ) : (
+        <label className="block space-y-1">
+          <span className="text-xs text-muted">Email</span>
+          <input name="email" type="email" required autoComplete="email" placeholder="you@example.com" className="w-full rounded-md border border-line bg-surface px-2 py-1.5" />
+        </label>
+      )}
+      <fieldset className="space-y-1">
+        <legend className="text-xs text-muted">Optional: what would Pro be worth to you per month?</legend>
+        {PRICE_ANSWERS.map((p) => (
+          <label key={p.value} className="flex items-center gap-2">
+            <input type="radio" name="price" value={p.value} /> {p.label}
+          </label>
+        ))}
+      </fieldset>
+      <button className="rounded-md bg-accent px-4 py-2 font-medium text-white hover:opacity-90">Join the Pro waitlist</button>
+      <p className="text-xs text-muted">We&rsquo;ll only email you about Pro. No payment needed.</p>
+    </form>
   );
 }

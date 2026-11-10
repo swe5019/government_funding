@@ -2,6 +2,11 @@
 export const dataConfig = {
   /** How many years of history the backfill loads. */
   backfillYears: 3,
+  /**
+   * `usaspending-backfill --lite`: a smaller history that fits a free database while demand is
+   * tested. Only awards of at least minAwardUsd, for this many years.
+   */
+  liteBackfill: { minAwardUsd: 1_000_000, years: 2 },
   /** Daily incremental re-reads this many days before the last loaded date to catch late edits. */
   incrementalOverlapDays: 3,
   /**

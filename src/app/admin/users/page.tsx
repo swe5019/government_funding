@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { formatDate } from "@/lib/format";
 import { requireAdmin } from "@/lib/admin/require-admin";
 import { getUserSummary, listUsers, type AdminUserRow } from "@/lib/admin/users";
+import { getWaitlistSummary, PRICE_ANSWERS } from "@/lib/waitlist";
 
 export default function UsersPage({ searchParams }: PageProps<"/admin/users">) {
   return (
@@ -23,7 +24,7 @@ async function Users({ searchParams }: { searchParams: PageProps<"/admin/users">
   await requireAdmin();
   const sp = await searchParams;
   const q = typeof sp.q === "string" ? sp.q : "";
-  const [summary, users] = await Promise.all([getUserSummary(), listUsers({ q })]);
+  const [summary, users, waitlist] = await Promise.all([getUserSummary(), listUsers({ q }), getWaitlistSummary()]);
   const tiles: [string, number][] = [
     ["Users", summary.total],
     ["New, 7 days", summary.last7Days],
@@ -43,6 +44,65 @@ async function Users({ searchParams }: { searchParams: PageProps<"/admin/users">
             <div className="tabular text-xl font-semibold">{n.toLocaleString()}</div>
           </div>
         ))}
+      </section>
+
+      <section className="space-y-3 rounded-md border border-line bg-surface p-4" aria-labelledby="waitlist-heading">
+        <h2 id="waitlist-heading" className="font-semibold">
+          Pro waitlist: {waitlist.total.toLocaleString()} {waitlist.total === 1 ? "person" : "people"}
+          <span className="ml-2 text-sm font-normal text-muted">({waitlist.last7Days} in the last 7 days)</span>
+        </h2>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <h3 className="mb-1 text-xs font-medium uppercase tracking-wide text-muted">What they&rsquo;d pay per month</h3>
+            <table className="w-full text-sm">
+              <tbody className="divide-y divide-line">
+                {PRICE_ANSWERS.map((p) => (
+                  <tr key={p.value}>
+                    <td className="py-1">{p.label}</td>
+                    <td className="tabular py-1 text-right">{waitlist.byPrice[p.value]}</td>
+                  </tr>
+                ))}
+                <tr>
+                  <td className="py-1 text-muted">Skipped the question</td>
+                  <td className="tabular py-1 text-right text-muted">{waitlist.byPrice.skipped}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div>
+            <h3 className="mb-1 text-xs font-medium uppercase tracking-wide text-muted">Where they joined from</h3>
+            <table className="w-full text-sm">
+              <tbody className="divide-y divide-line">
+                {waitlist.bySource.map((s) => (
+                  <tr key={s.source}>
+                    <td className="py-1 font-mono text-xs">{s.source}</td>
+                    <td className="tabular py-1 text-right">{s.n}</td>
+                  </tr>
+                ))}
+                {!waitlist.bySource.length && (
+                  <tr>
+                    <td className="py-1 text-muted">No sign-ups yet</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {waitlist.recent.length > 0 && (
+          <details className="text-sm">
+            <summary className="cursor-pointer text-muted">Latest {waitlist.recent.length} sign-ups</summary>
+            <ul className="mt-2 divide-y divide-line">
+              {waitlist.recent.map((w) => (
+                <li key={w.email} className="flex flex-wrap justify-between gap-2 py-1">
+                  <span>{w.email}</span>
+                  <span className="text-muted">
+                    {w.priceAnswer ? `$${w.priceAnswer}` : "—"} · {w.source ?? "—"} · {formatDate(w.createdAt)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
       </section>
 
       <form className="flex gap-2" role="search">

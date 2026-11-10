@@ -37,7 +37,7 @@ async function Watchlists({ searchParams }: { searchParams: PageProps<"/watchlis
   if (!viewer.user) redirect("/signin?callbackUrl=/watchlists");
   if (!viewer.entitlements.watchlists) {
     return (
-      <UpgradeNotice title="Watchlists and email alerts are part of Pro">
+      <UpgradeNotice title="Watchlists and email alerts are part of Pro" source="feature:watchlists">
         Track the companies you care about and get an email when one wins a federal award above the amount you choose.
       </UpgradeNotice>
     );

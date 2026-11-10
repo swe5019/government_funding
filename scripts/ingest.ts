@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { parseArgs } from "node:util";
+import { dataConfig } from "@/config/data";
 import { sendAlerts } from "@/jobs/alerts";
 import { syncAgencies } from "@/jobs/agencies";
 import { dodAnnouncements } from "@/jobs/dod-announcements";
@@ -28,6 +29,8 @@ Jobs:
       --kind contracts|assistance
       --force              reload chunks that already succeeded
       --limit <rows>       stop after N rows per chunk (smoke test)
+      --lite               only awards of $1M+ for the last 2 years (src/config/data.ts liteBackfill)
+      --min-award <usd>    only awards with at least this total obligation
   usaspending-daily      Load records modified since the last load, then roll up
   usaspending-file <path> Load a local bulk-download .zip or .csv
       --kind contracts|assistance   required for a CSV whose name doesn't say
@@ -67,6 +70,8 @@ async function main() {
       full: { type: "boolean" },
       file: { type: "string" },
       date: { type: "string" },
+      lite: { type: "boolean" },
+      "min-award": { type: "string" },
       help: { type: "boolean" },
     },
   });
@@ -85,7 +90,8 @@ async function main() {
       await syncAgencies();
       await withJobLock(USASPENDING_LOCK, () =>
         usaspendingBackfill({
-          years: values.years ? Number(values.years) : undefined,
+          years: values.years ? Number(values.years) : values.lite ? dataConfig.liteBackfill.years : undefined,
+          minAwardUsd: values["min-award"] ? Number(values["min-award"]) : values.lite ? dataConfig.liteBackfill.minAwardUsd : undefined,
           month: values.month,
           kinds: kind ? [kind] : undefined,
           force: values.force,
