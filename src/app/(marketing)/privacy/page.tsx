@@ -16,6 +16,10 @@ export default function PrivacyPage() {
         history and sign-in sessions and cancels any subscription; payment records are kept by our payment processor as the
         law requires.
       </p>
+      <p className="text-sm">
+        If you join the Pro waitlist we store your email address and your optional price answer, and use them only to tell you
+        about Pro. We count visits with Vercel Web Analytics, which does not use cookies.
+      </p>
       <p className="text-sm text-muted">Questions: {siteConfig.supportEmail}</p>
     </article>
   );

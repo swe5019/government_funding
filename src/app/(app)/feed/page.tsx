@@ -38,7 +38,7 @@ async function Feed({ searchParams }: { searchParams: PageProps<"/feed">["search
   const [viewer, sp] = await Promise.all([getViewer(), searchParams]);
   if (!viewer.entitlements.largeAwardsFeed) {
     return (
-      <UpgradeNotice title="The daily large-awards feed is part of Pro">
+      <UpgradeNotice title="The daily large-awards feed is part of Pro" source="feature:feed">
         Every federal award of {formatUsdCompact(cfg.defaultMinUsd)} or more to a public company, as soon as it&rsquo;s
         published, with a link to the government record.
       </UpgradeNotice>

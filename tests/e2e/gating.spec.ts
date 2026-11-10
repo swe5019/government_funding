@@ -89,6 +89,12 @@ test.describe("admin", () => {
     await expect(page.getByRole("link", { name: "Get daily updates with Pro" })).toHaveCount(0);
   });
 
+  test("users page shows the Pro waitlist summary", async ({ page }) => {
+    await page.goto("/admin/users");
+    await expect(page.getByRole("heading", { name: /Pro waitlist:/ })).toBeVisible();
+    await expect(page.getByText("What they’d pay per month")).toBeVisible();
+  });
+
   test("users page lists sign-ups with totals", async ({ page }) => {
     const res = await page.goto("/admin/users");
     expect(res?.status()).toBe(200);

@@ -648,6 +648,21 @@ model AuditLog {
   @@index([entity, entityId])
 }
 
+/// Pro waitlist sign-ups while paid plans are not on sale (demand test). One row per email.
+model WaitlistEntry {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  userId      String?
+  /// What they said they'd pay per month: "0" | "10" | "19" | "29+" (or null if skipped)
+  priceAnswer String?
+  /// Where they joined from, e.g. "pricing" or "feature:screener"
+  source      String?
+  createdAt   DateTime @default(now()) @db.Timestamptz
+  updatedAt   DateTime @updatedAt @db.Timestamptz
+
+  @@index([createdAt])
+}
+
 /// Processed Stripe webhook events (idempotency: a replayed event is a no-op).
 model StripeEvent {
   id          String   @id

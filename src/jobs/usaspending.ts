@@ -24,14 +24,20 @@ export function backfillMonths(years: number, today = new Date()): { start: stri
   return out;
 }
 
-async function downloadAndLoad(req: BulkDownloadRequest, ctx: ChunkContext, availability: AvailabilityMode, limit?: number) {
+async function downloadAndLoad(
+  req: BulkDownloadRequest,
+  ctx: ChunkContext,
+  availability: AvailabilityMode,
+  limit?: number,
+  minAwardUsd?: number,
+) {
   const fileName = await requestBulkDownload(req);
   ctx.log.info(`requested ${req.kind} ${req.dateType} ${req.startDate}..${req.endDate} -> ${fileName}`);
   const url = await waitForDownload(fileName, ctx.log.info);
   const dir = path.join(os.tmpdir(), "alloqent-usaspending");
   const file = await downloadToFile(url, dir);
   try {
-    return await loadUsaspendingFile(file, ctx, { availability, limit, kind: req.kind });
+    return await loadUsaspendingFile(file, ctx, { availability, limit, kind: req.kind, minAwardUsd });
   } finally {
     await rm(file, { force: true });
   }
@@ -44,6 +50,11 @@ export interface BackfillOptions {
   month?: string;
   force?: boolean;
   limit?: number;
+  /**
+   * "Lite" history: keep only awards whose total obligation is at least this (USD). Uses its own
+   * chunk keys, so a later full backfill of the same months still runs.
+   */
+  minAwardUsd?: number;
   log?: Logger;
 }
 
@@ -61,11 +72,12 @@ export async function usaspendingBackfill(opts: BackfillOptions = {}) {
   for (const m of months) {
     for (const kind of opts.kinds ?? KINDS) {
       const isCurrent = m.key === currentMonth;
+      const lite = opts.minAwardUsd ? `:min${opts.minAwardUsd}` : "";
       const res = await runChunk(
         {
           job: "usaspending_backfill",
-          chunkKey: isCurrent ? `${kind}:${m.key}:partial:${iso(new Date())}` : `${kind}:${m.key}`,
-          params: { kind, ...m, limit: opts.limit },
+          chunkKey: isCurrent ? `${kind}:${m.key}${lite}:partial:${iso(new Date())}` : `${kind}:${m.key}${lite}`,
+          params: { kind, ...m, limit: opts.limit, minAwardUsd: opts.minAwardUsd },
           force: opts.force,
           log,
         },
@@ -75,6 +87,7 @@ export async function usaspendingBackfill(opts: BackfillOptions = {}) {
             ctx,
             { kind: "sourceDate" },
             opts.limit,
+            opts.minAwardUsd,
           );
           if (r.maxLastModified && (!maxLm || r.maxLastModified > maxLm)) maxLm = r.maxLastModified;
         },
@@ -131,7 +144,10 @@ export async function usaspendingDaily(opts: { log?: Logger; limit?: number } = 
 }
 
 /** Load a local zip/CSV (fixtures, or a file downloaded by hand from usaspending.gov). */
-export async function usaspendingLoadLocal(file: string, opts: { kind?: FileKind; limit?: number; incremental?: boolean; log?: Logger }) {
+export async function usaspendingLoadLocal(
+  file: string,
+  opts: { kind?: FileKind; limit?: number; incremental?: boolean; minAwardUsd?: number; log?: Logger },
+) {
   let maxLm: string | null = null;
   await runChunk(
     {
@@ -147,6 +163,7 @@ export async function usaspendingLoadLocal(file: string, opts: { kind?: FileKind
         availability: opts.incremental ? { kind: "now" } : { kind: "sourceDate" },
         kind: opts.kind,
         limit: opts.limit,
+        minAwardUsd: opts.minAwardUsd,
       });
       maxLm = r.maxLastModified;
     },

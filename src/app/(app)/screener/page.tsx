@@ -32,7 +32,7 @@ async function Screener({ searchParams }: { searchParams: PageProps<"/screener">
   const [viewer, sp] = await Promise.all([getViewer(), searchParams]);
   if (!viewer.entitlements.screener) {
     return (
-      <UpgradeNotice title="The screener is part of Pro">
+      <UpgradeNotice title="The screener is part of Pro" source="feature:screener">
         Filter public companies by federal award growth, award size, awarding agency and sector.
       </UpgradeNotice>
     );

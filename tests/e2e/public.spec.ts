@@ -112,3 +112,13 @@ test("AI theme lists announced AI deals the award data misses, with ceilings kep
   // Full amount on desktop, compact ("$10B") on phones.
   await expect(section.getByText(/^\$10(,000,000,000|(\.0)?B)$/).filter({ visible: true }).first()).toBeVisible();
 });
+
+test("Pro waitlist: a visitor joins with an email and a price answer", async ({ page }) => {
+  await page.goto("/screener");
+  await page.getByRole("link", { name: "Join the Pro waitlist" }).click();
+  await expect(page).toHaveURL(/\/pricing\?from=feature%3Ascreener/);
+  await page.getByLabel("Email").fill(`visitor-${Date.now()}@example.com`);
+  await page.getByLabel("About $19/month").check();
+  await page.getByRole("button", { name: "Join the Pro waitlist" }).click();
+  await expect(page.getByRole("status")).toContainText("on the Pro waitlist");
+});

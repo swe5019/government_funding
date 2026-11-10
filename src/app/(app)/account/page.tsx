@@ -6,6 +6,7 @@ import { plans } from "@/config/plans";
 import { formatDate } from "@/lib/format";
 import { getViewer } from "@/lib/gating/viewer";
 import { DELETE_CONFIRMATION } from "@/lib/account/delete";
+import { billingConfigured } from "@/lib/billing/stripe";
 import { manageBillingAction, signOutAction } from "../pricing/actions";
 import { deleteAccountAction } from "./actions";
 
@@ -85,7 +86,7 @@ async function Account({ searchParams }: { searchParams: PageProps<"/account">["
           )}
           {viewer.plan === "free" && (
             <Link href="/pricing" className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:opacity-90">
-              {viewer.user.trialUsedAt ? "Upgrade to Pro" : `Try Pro free for ${plans.pro.trialDays} days`}
+              {!billingConfigured() ? "Join the Pro waitlist" : viewer.user.trialUsedAt ? "Upgrade to Pro" : `Try Pro free for ${plans.pro.trialDays} days`}
             </Link>
           )}
         </div>

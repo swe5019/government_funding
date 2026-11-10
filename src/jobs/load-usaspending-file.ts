@@ -14,6 +14,8 @@ export interface LoadOptions {
   limit?: number;
   /** Force the file kind for a bare CSV whose name doesn't say. */
   kind?: FileKind;
+  /** Skip rows whose award's total obligation is below this (USD, absolute value): "lite" history. */
+  minAwardUsd?: number;
 }
 
 /** Latest last_modified_date seen in the file — becomes DataFreshness.dataThrough. */
@@ -69,6 +71,10 @@ async function loadCsvStream(
     ctx.stats.rowsRead++;
     try {
       const parsed = parseRow(kind, raw);
+      if (opts.minAwardUsd && Math.abs(Number(parsed.award.totalObligated)) < opts.minAwardUsd) {
+        ctx.stats.rowsSkipped++;
+        continue;
+      }
       batch.push(parsed);
       const lm = parsed.transaction.lastModifiedDate;
       if (!result.maxLastModified || lm > result.maxLastModified) result.maxLastModified = lm;
