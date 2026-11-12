@@ -118,8 +118,9 @@ export function dailyRequests(lastThrough: Date | null, today: Date): BulkDownlo
  * Daily incremental load. New rows get availableAt = now(), which drives the free-tier delay
  * and alerts; rows already loaded keep theirs and are only updated when their content changed.
  */
-export async function usaspendingDaily(opts: { log?: Logger; limit?: number } = {}) {
+export async function usaspendingDaily(opts: { log?: Logger; limit?: number; minAwardUsd?: number } = {}) {
   const log = opts.log ?? consoleLogger;
+  const minAwardUsd = opts.minAwardUsd ?? dataConfig.minAwardUsd;
   const { rows } = await jobPool().query<{ through: Date }>(
     `SELECT "dataThrough" AS through FROM "DataFreshness" WHERE source = 'usaspending'`,
   );
@@ -130,12 +131,12 @@ export async function usaspendingDaily(opts: { log?: Logger; limit?: number } = 
       {
         job: "usaspending_daily",
         chunkKey: `${req.kind}:${req.dateType}:${req.startDate}..${req.endDate}`,
-        params: { ...req, limit: opts.limit },
+        params: { ...req, limit: opts.limit, minAwardUsd },
         force: true,
         log,
       },
       async (ctx) => {
-        const r = await downloadAndLoad(req, ctx, { kind: "now" }, opts.limit);
+        const r = await downloadAndLoad(req, ctx, { kind: "now" }, opts.limit, minAwardUsd || undefined);
         maxLm = r.maxLastModified;
       },
     );

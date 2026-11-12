@@ -58,13 +58,3 @@ export async function getLargestRecentAwards(id: string, win: DataWindow, days =
 export async function getFreshness(source = "usaspending") {
   return prisma.dataFreshness.findUnique({ where: { source } });
 }
-
-/** Smallest award size loaded by a "lite" backfill, if one ran (history then omits smaller awards). */
-export async function getLiteHistoryMinimum(): Promise<number | null> {
-  const run = await prisma.ingestionRun.findFirst({
-    where: { job: "usaspending_backfill", status: "SUCCEEDED", chunkKey: { contains: ":min" } },
-    select: { chunkKey: true },
-  });
-  const m = run && /:min(\d+)/.exec(run.chunkKey);
-  return m ? Number(m[1]) : null;
-}

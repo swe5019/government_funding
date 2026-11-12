@@ -3,10 +3,14 @@ export const dataConfig = {
   /** How many years of history the backfill loads. */
   backfillYears: 3,
   /**
-   * `usaspending-backfill --lite`: a smaller history that fits a free database while demand is
-   * tested. Only awards of at least minAwardUsd, for this many years.
+   * Storage cutoff: only awards whose total obligation is at least this (USD, absolute value) are
+   * loaded, so the data fits a free database while demand is tested. Contracts under $100K were
+   * ~80% of rows but a sliver of the dollars. Set to 0 to load everything (needs a paid plan),
+   * then run a full backfill. `prune-awards` removes stored awards below it.
    */
-  liteBackfill: { minAwardUsd: 1_000_000, years: 2 },
+  minAwardUsd: 1_000_000,
+  /** `usaspending-backfill --lite`: years of history for the free database. */
+  liteBackfill: { years: 2 },
   /** Daily incremental re-reads this many days before the last loaded date to catch late edits. */
   incrementalOverlapDays: 3,
   /**

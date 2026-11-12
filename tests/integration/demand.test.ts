@@ -1,7 +1,7 @@
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-/** Pro waitlist storage and the "lite" (large awards only) history load. Needs TEST_DATABASE_URL. */
+/** Pro waitlist storage, the storage cutoff on loads, and pruning small awards. Needs TEST_DATABASE_URL. */
 const url = process.env.TEST_DATABASE_URL;
 const fixtures = path.join(__dirname, "..", "fixtures");
 const silent = { info: () => {}, error: () => {} };
@@ -13,7 +13,7 @@ describe.skipIf(!url)("demand test features (integration)", async () => {
   const { closeJobPool } = await import("@/jobs/runner");
   const { joinWaitlist, getWaitlistSummary } = await import("@/lib/waitlist");
   const { usaspendingLoadLocal } = await import("@/jobs/usaspending");
-  const { getLiteHistoryMinimum } = await import("@/lib/recipients");
+  const { pruneAwards } = await import("@/jobs/prune-awards");
 
   beforeAll(async () => {
     await prisma.$executeRawUnsafe(
@@ -46,11 +46,28 @@ describe.skipIf(!url)("demand test features (integration)", async () => {
     expect(run?.rowsSkipped).toBeGreaterThan(0);
   });
 
-  it("the history note appears once a lite backfill chunk has succeeded", async () => {
-    expect(await getLiteHistoryMinimum()).toBeNull();
-    await prisma.ingestionRun.create({
-      data: { job: "usaspending_backfill", chunkKey: "contracts:2025-03:min1000000", params: {}, status: "SUCCEEDED" },
-    });
-    expect(await getLiteHistoryMinimum()).toBe(1_000_000);
+  it("prune-awards deletes awards below the cutoff with their transactions, and keeps the rest", async () => {
+    await prisma.$executeRawUnsafe(`TRUNCATE "AwardTransaction", "Award" CASCADE`);
+    await usaspendingLoadLocal(path.join(fixtures, "All_Contracts_PrimeTransactions_sample_1.csv"), { log: silent });
+    const all = await prisma.award.findMany({ select: { id: true, totalObligated: true } });
+    // The fixture's awards are all large, so cut at the largest one: it stays, the rest go.
+    const cutoff = Math.max(...all.map((a) => Math.abs(Number(a.totalObligated))));
+    const big = all.filter((a) => Math.abs(Number(a.totalObligated)) >= cutoff).map((a) => a.id).sort();
+    expect(big.length).toBeGreaterThan(0);
+    expect(big.length).toBeLessThan(all.length);
+
+    await pruneAwards({ minAwardUsd: cutoff, log: silent });
+
+    const left = (await prisma.award.findMany({ select: { id: true } })).map((a) => a.id).sort();
+    expect(left).toEqual(big);
+    const orphans = await prisma.awardTransaction.count({ where: { awardId: { notIn: big } } });
+    expect(orphans).toBe(0);
+    expect(await prisma.awardTransaction.count()).toBeGreaterThan(0);
+  });
+
+  it("a cutoff of 0 prunes nothing", async () => {
+    const before = await prisma.award.count();
+    await pruneAwards({ minAwardUsd: 0, log: silent });
+    expect(await prisma.award.count()).toBe(before);
   });
 });
