@@ -4,6 +4,7 @@ import { dataConfig } from "@/config/data";
 import { sendAlerts } from "@/jobs/alerts";
 import { syncAgencies } from "@/jobs/agencies";
 import { dodAnnouncements } from "@/jobs/dod-announcements";
+import { dbStats } from "@/jobs/db-stats";
 import { edgarFilings } from "@/jobs/edgar-filings";
 import { federalRegister } from "@/jobs/federal-register";
 import { edgarCompanies } from "@/jobs/edgar-companies";
@@ -54,6 +55,7 @@ Jobs:
   sam-opportunities      SAM.gov contract award notices, last 7 days (needs SAM_API_KEY)
   federal-register       Federal Register rules/notices for configured programs
   edgar-filings          8-Ks (screened for contract language) and 10-K Exhibit 21 subsidiaries
+  db-stats               Read-only report: database size, largest tables, awards by size
       --limit <n>          max companies this run
 `;
 
@@ -160,6 +162,9 @@ async function main() {
       break;
     case "edgar-filings":
       await withJobLock("edgar", () => edgarFilings({ limit }));
+      break;
+    case "db-stats":
+      await dbStats();
       break;
     default:
       console.error(`unknown job "${job}"\n\n${USAGE}`);
