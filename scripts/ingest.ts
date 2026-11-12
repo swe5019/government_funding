@@ -5,6 +5,7 @@ import { sendAlerts } from "@/jobs/alerts";
 import { syncAgencies } from "@/jobs/agencies";
 import { dodAnnouncements } from "@/jobs/dod-announcements";
 import { dbStats } from "@/jobs/db-stats";
+import { pruneAwards } from "@/jobs/prune-awards";
 import { edgarFilings } from "@/jobs/edgar-filings";
 import { federalRegister } from "@/jobs/federal-register";
 import { edgarCompanies } from "@/jobs/edgar-companies";
@@ -30,8 +31,10 @@ Jobs:
       --kind contracts|assistance
       --force              reload chunks that already succeeded
       --limit <rows>       stop after N rows per chunk (smoke test)
-      --lite               only awards of $1M+ for the last 2 years (src/config/data.ts liteBackfill)
-      --min-award <usd>    only awards with at least this total obligation
+      --lite               the last 2 years only (src/config/data.ts liteBackfill)
+      --min-award <usd>    only awards with at least this total obligation (default: the storage
+                           cutoff in src/config/data.ts, $1M; 0 loads everything). Also applies to
+                           usaspending-daily, usaspending-file and prune-awards
   usaspending-daily      Load records modified since the last load, then roll up
   usaspending-file <path> Load a local bulk-download .zip or .csv
       --kind contracts|assistance   required for a CSV whose name doesn't say
@@ -55,6 +58,7 @@ Jobs:
   sam-opportunities      SAM.gov contract award notices, last 7 days (needs SAM_API_KEY)
   federal-register       Federal Register rules/notices for configured programs
   edgar-filings          8-Ks (screened for contract language) and 10-K Exhibit 21 subsidiaries
+  prune-awards           Delete stored awards below the storage cutoff, compact the tables, rebuild totals
   db-stats               Read-only report: database size, largest tables, awards by size
       --limit <n>          max companies this run
 `;
@@ -86,6 +90,9 @@ async function main() {
   const kind = values.kind as FileKind | undefined;
   if (kind && kind !== "contracts" && kind !== "assistance") throw new Error(`bad --kind ${kind}`);
   const limit = values.limit ? Number(values.limit) : undefined;
+  // Storage cutoff (src/config/data.ts); --min-award 0 loads everything.
+  const minAward = values["min-award"] !== undefined ? Number(values["min-award"]) : dataConfig.minAwardUsd;
+  if (!Number.isFinite(minAward) || minAward < 0) throw new Error(`bad --min-award ${values["min-award"]}`);
 
   switch (job) {
     case "usaspending-backfill":
@@ -93,7 +100,7 @@ async function main() {
       await withJobLock(USASPENDING_LOCK, () =>
         usaspendingBackfill({
           years: values.years ? Number(values.years) : values.lite ? dataConfig.liteBackfill.years : undefined,
-          minAwardUsd: values["min-award"] ? Number(values["min-award"]) : values.lite ? dataConfig.liteBackfill.minAwardUsd : undefined,
+          minAwardUsd: minAward || undefined,
           month: values.month,
           kinds: kind ? [kind] : undefined,
           force: values.force,
@@ -105,7 +112,7 @@ async function main() {
       break;
     case "usaspending-daily":
       await syncAgencies();
-      await withJobLock(USASPENDING_LOCK, () => usaspendingDaily({ limit }));
+      await withJobLock(USASPENDING_LOCK, () => usaspendingDaily({ limit, minAwardUsd: minAward }));
       await withJobLock("rollup", () => rollupRecipients());
       await withJobLock("programs", () => tagPrograms());
       await withJobLock("mapping", () => matchAndRollup(false));
@@ -121,7 +128,7 @@ async function main() {
       break;
     case "usaspending-file":
       if (!arg) throw new Error("usaspending-file needs a path");
-      await withJobLock(USASPENDING_LOCK, () => usaspendingLoadLocal(arg, { kind, limit, incremental: values.incremental }));
+      await withJobLock(USASPENDING_LOCK, () => usaspendingLoadLocal(arg, { kind, limit, incremental: values.incremental, minAwardUsd: minAward || undefined }));
       await withJobLock("rollup", () => rollupRecipients());
       break;
     case "usaspending-agencies":
@@ -162,6 +169,14 @@ async function main() {
       break;
     case "edgar-filings":
       await withJobLock("edgar", () => edgarFilings({ limit }));
+      break;
+    case "prune-awards":
+      // Deleted rows leave no trace for the incremental rollups, so rebuild everything after.
+      await withJobLock(USASPENDING_LOCK, () => pruneAwards({ minAwardUsd: minAward }));
+      await withJobLock("rollup", () => rollupRecipients({ full: true }));
+      await withJobLock("mapping", () => rollupCompanies());
+      await withJobLock("programs", () => rollupSummaries());
+      await dbStats();
       break;
     case "db-stats":
       await dbStats();

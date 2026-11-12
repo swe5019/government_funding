@@ -30,6 +30,10 @@ Go through the steps in order. Each one says what to copy where.
 4. Sizing: a 3-year backfill of every contract and assistance transaction is tens of GB with indexes.
    Load one month first (`usaspending-backfill --month YYYY-MM`), check the size in the Neon console, and
    extrapolate before choosing a plan. Raise autoscaling (2+ CU) while the backfill runs.
+   On the free plan (1 GB), loads keep only awards of $1M or more (`minAwardUsd` in
+   `src/config/data.ts`; contracts under $100K were ~70% of storage). `pnpm ingest prune-awards`
+   deletes stored awards below the cutoff and compacts the tables; `pnpm ingest db-stats` shows what
+   uses the space. To keep everything on a paid plan, set the cutoff to 0 and run a full backfill.
 5. Backups: Neon keeps point-in-time history for your plan's retention window. Before risky operations
    (big migrations, a full re-match) create a branch, which is an instant copy. For an independent copy,
    schedule `pg_dump --format=custom "$DIRECT_URL"` to your own storage.
