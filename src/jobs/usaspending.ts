@@ -68,10 +68,15 @@ export async function usaspendingBackfill(opts: BackfillOptions = {}) {
   const months = backfillMonths(opts.years ?? dataConfig.backfillYears).filter((m) => !opts.month || m.key === opts.month);
   const currentMonth = iso(new Date()).slice(0, 7);
   let maxLm: string | null = null;
+  const covered = opts.minAwardUsd && !opts.force ? await coveredMonths(opts.minAwardUsd) : new Set<string>();
 
   for (const m of months) {
     for (const kind of opts.kinds ?? KINDS) {
       const isCurrent = m.key === currentMonth;
+      if (!isCurrent && covered.has(`${kind}:${m.key}`)) {
+        log.info(`usaspending_backfill ${kind}:${m.key}: already loaded with a lower cutoff, skipping`);
+        continue;
+      }
       const lite = opts.minAwardUsd ? `:min${opts.minAwardUsd}` : "";
       const res = await runChunk(
         {
@@ -95,6 +100,22 @@ export async function usaspendingBackfill(opts: BackfillOptions = {}) {
       if (res.status === "succeeded" && maxLm) await markFresh("usaspending", maxLm);
     }
   }
+}
+
+/**
+ * Months already loaded with no cutoff or a lower one: they hold every award a higher cutoff
+ * would keep (prune-awards removes the rest), so raising the cutoff needn't re-download them.
+ */
+export async function coveredMonths(minAwardUsd: number): Promise<Set<string>> {
+  const { rows } = await jobPool().query<{ chunkKey: string }>(
+    `SELECT DISTINCT "chunkKey" FROM "IngestionRun" WHERE job = 'usaspending_backfill' AND status = 'SUCCEEDED'`,
+  );
+  const out = new Set<string>();
+  for (const { chunkKey } of rows) {
+    const m = /^(contracts|assistance):(\d{4}-\d{2})(?::min(\d+))?$/.exec(chunkKey);
+    if (m && (!m[3] || Number(m[3]) <= minAwardUsd)) out.add(`${m[1]}:${m[2]}`);
+  }
+  return out;
 }
 
 /**

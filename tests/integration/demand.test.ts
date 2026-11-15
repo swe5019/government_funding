@@ -14,6 +14,7 @@ describe.skipIf(!url)("demand test features (integration)", async () => {
   const { joinWaitlist, getWaitlistSummary } = await import("@/lib/waitlist");
   const { usaspendingLoadLocal } = await import("@/jobs/usaspending");
   const { pruneAwards } = await import("@/jobs/prune-awards");
+  const { coveredMonths } = await import("@/jobs/usaspending");
 
   beforeAll(async () => {
     await prisma.$executeRawUnsafe(
@@ -69,5 +70,17 @@ describe.skipIf(!url)("demand test features (integration)", async () => {
     const before = await prisma.award.count();
     await pruneAwards({ minAwardUsd: 0, log: silent });
     expect(await prisma.award.count()).toBe(before);
+  });
+
+  it("months loaded with a lower cutoff (or none) count as covered when the cutoff is raised", async () => {
+    const run = (chunkKey: string, status: "SUCCEEDED" | "FAILED" = "SUCCEEDED") =>
+      prisma.ingestionRun.create({ data: { job: "usaspending_backfill", chunkKey, params: {}, status } });
+    await run("contracts:2025-01:min1000000");
+    await run("assistance:2025-01");
+    await run("contracts:2025-02:min500000000");
+    await run("assistance:2025-02:min1000000", "FAILED");
+    await run("contracts:2026-11:min1000000:partial:2026-11-12");
+    const covered = await coveredMonths(100_000_000);
+    expect([...covered].sort()).toEqual(["assistance:2025-01", "contracts:2025-01"]);
   });
 });
