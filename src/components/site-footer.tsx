@@ -12,7 +12,10 @@ export function SiteFooter() {
           Data: <a className="underline" href="https://www.usaspending.gov" rel="noopener noreferrer" target="_blank">USAspending.gov</a>{" "}
           (U.S. Department of the Treasury). {siteConfig.name} is not affiliated with any government agency.
         </p>
-        <nav className="flex gap-4">
+        <nav className="flex flex-wrap gap-4">
+          <Link href="/top-government-contractors" className="underline">Top government contractors</Link>
+          <Link href="/programs" className="underline">Sectors and programs</Link>
+          <Link href="/grant-programs" className="underline">Grant programs</Link>
           <Link href="/disclaimer" className="underline">Disclaimer</Link>
           <Link href="/privacy" className="underline">Privacy</Link>
           <Link href="/terms" className="underline">Terms</Link>

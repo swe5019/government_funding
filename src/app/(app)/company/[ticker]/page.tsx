@@ -11,6 +11,8 @@ import { EarlySignalsSection } from "@/components/early-signals";
 import { getAnnouncements, getContractFilings } from "@/lib/announcements";
 import { getCommitments } from "@/lib/commitments";
 import { LastUpdated } from "@/components/last-updated";
+import { UpgradeNotice } from "@/components/upgrade-notice";
+import { getCompanySnippet } from "@/lib/rankings";
 import { MatchBadge } from "@/components/match-badge";
 import { SourceLink } from "@/components/source-link";
 import { JsonLd } from "@/components/json-ld";
@@ -27,7 +29,7 @@ import {
   getPriceSeries,
   getTopAgencies,
 } from "@/lib/companies";
-import { formatDate, formatMonth, formatUsd, formatUsdCompact } from "@/lib/format";
+import { displayCompanyName, formatDate, formatMonth, formatUsd, formatUsdCompact } from "@/lib/format";
 import { dataWindow, type DataWindow } from "@/lib/gating/dataCutoff";
 import { getViewer, type Viewer } from "@/lib/gating/viewer";
 import { watchlistsContaining } from "@/lib/watchlists";
@@ -38,13 +40,16 @@ import { fillMonths, summarizePeriods } from "@/lib/periods";
 export async function generateMetadata({ params }: PageProps<"/company/[ticker]">): Promise<Metadata> {
   const { ticker } = await params;
   const t = decodeURIComponent(ticker).toUpperCase();
-  const description = `Federal contracts, grants and program awards linked to ${t}, from official U.S. government records. Informational only, not investment advice.`;
-  return {
-    title: `${t} federal contracts and grants`,
-    description,
-    alternates: { canonical: `/company/${encodeURIComponent(t)}` },
-    openGraph: { title: `${t} federal contracts and grants`, description, url: `/company/${encodeURIComponent(t)}` },
-  };
+  const snip = await getCompanySnippet(t);
+  const who = snip ? `${displayCompanyName(snip.name)} (${t})` : t;
+  const title = `${who} government contracts and federal awards`;
+  const description = snip
+    ? snip.last12 > 0
+      ? `${who} received ${formatUsdCompact(snip.last12)} in U.S. federal contracts and grants over the last 12 months${snip.topAgency ? `, mostly from the ${snip.topAgency}` : ""}. See every award, agency and program, from official USAspending.gov records.`
+      : `Federal contracts, grants and program awards linked to ${who}, by month, agency and program, from official USAspending.gov records.`
+    : `Federal contracts, grants and program awards linked to ${t}, from official U.S. government records.`;
+  const url = `/company/${encodeURIComponent(t)}`;
+  return { title, description, alternates: { canonical: url }, openGraph: { title, description, url } };
 }
 
 export default function CompanyPage({ params }: PageProps<"/company/[ticker]">) {
@@ -129,6 +134,12 @@ async function Company({ params }: { params: PageProps<"/company/[ticker]">["par
           Excludes {formatUsdCompact(possibleExtra)} to recipients that are only a <strong>possible match</strong> for{" "}
           {company.ticker} (unverified links, listed below).
         </p>
+      )}
+
+      {!viewer.entitlements.emailAlerts && (
+        <UpgradeNotice title={`Get an email when ${company.ticker} wins a new federal award`} source="company-alert">
+          Pro sends alerts the day an award is published, instead of the free view&rsquo;s 7-day delay.
+        </UpgradeNotice>
       )}
 
       <section className={section}>

@@ -152,8 +152,15 @@ Check `/admin/ingestion` after each step: every chunk is logged with row counts 
 ## 10. SEO
 
 - `robots.txt` and `sitemap.xml` are generated (`src/app/robots.ts`, `src/app/sitemap.ts`). The sitemap
-  reads the database per request and lists the static pages, programs, and companies with a confirmed
-  link. Submit `https://alloqent.com/sitemap.xml` in Google Search Console and Bing Webmaster Tools.
+  reads the database per request and lists the static pages, `/top-government-contractors`, programs,
+  and companies with a confirmed link and award data. Submit `https://alloqent.com/sitemap.xml` in
+  Google Search Console and Bing Webmaster Tools.
+- Ownership verification (HTML-tag method): put the token in `GOOGLE_SITE_VERIFICATION` (Search Console)
+  and/or `BING_SITE_VERIFICATION` (Bing `msvalidate.01`) in Vercel Production, redeploy, then click
+  Verify.
+- Company titles and descriptions carry the company name, its last-12-month total and top agency (free
+  view), which is what shows in search results. The home page carries `WebSite` (sitelinks search box)
+  and `FAQPage` structured data; the rankings page an `ItemList`.
 - Company and program pages set canonical URLs; company pages include `Dataset` structured data.
 - Account, admin, watchlist and sign-in pages are disallowed in robots.txt and/or marked `noindex`.
 - With streaming, pages that resolve to "not found" after the shell is sent return HTTP 200 with
