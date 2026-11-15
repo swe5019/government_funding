@@ -3,6 +3,7 @@ import { expect, expectAccessible, test } from "./fixtures";
 
 const PAGES = [
   "/",
+  "/top-government-contractors",
   "/search?q=lockheed",
   "/company/LMT",
   "/programs",
@@ -122,3 +123,18 @@ test("Pro waitlist: a visitor joins with an email and a price answer", async ({ 
   await page.getByRole("button", { name: "Join the Pro waitlist" }).click();
   await expect(page.getByRole("status")).toContainText("on the Pro waitlist");
 });
+
+test("top contractors ranks linked companies and the home page links to it", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Government contracts and grants to public companies");
+  await page.getByRole("link", { name: "Top 100 →" }).click();
+  await expect(page).toHaveURL(/\/top-government-contractors$/);
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Top government contractors");
+  await expect(page.getByRole("link", { name: /LMT/ }).first()).toBeVisible();
+});
+
+test("company page title names the company and its 12-month total", async ({ page }) => {
+  await page.goto("/company/LMT");
+  await expect(page).toHaveTitle(/\(LMT\) government contracts and federal awards/);
+});
+

@@ -50,3 +50,25 @@ const RECIPIENT_TYPE_LABELS: Record<string, string> = {
 };
 
 export const recipientTypeLabel = (t: string) => RECIPIENT_TYPE_LABELS[t] ?? t;
+
+const LOWER_WORDS = new Set(["of", "the", "and", "for"]);
+
+/**
+ * "LOCKHEED MARTIN CORP" -> "Lockheed Martin": SEC names are often upper case with legal suffixes.
+ * Short or symbol-bearing words (RTX, AT&T, L3HARRIS) stay upper case since they're usually acronyms.
+ */
+export function displayCompanyName(name: string): string {
+  // SEC adds the state of incorporation, e.g. "/DE/".
+  const base = name.replace(/\s*\/[A-Z]{2,3}\/?\s*$/, "");
+  const trimmed = base.replace(/[,.]?\s+(inc|corp|corporation|co|company|ltd|plc|llc|holdings?|group|n\.?v|s\.?a)\.?$/i, "").trim() || base;
+  if (trimmed !== trimmed.toUpperCase()) return trimmed;
+  return trimmed
+    .split(/\s+/)
+    .map((w, i) => {
+      const lower = w.toLowerCase();
+      if (i > 0 && LOWER_WORDS.has(lower)) return lower;
+      if (w.length <= 3 || /[^A-Z'-]/.test(w)) return w;
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
+    })
+    .join(" ");
+}

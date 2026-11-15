@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 import { connection } from "next/server";
 import { siteConfig } from "@/config/site";
 import { prisma } from "@/lib/db";
-import { CONFIRMED_SQL } from "@/lib/mapping/sql";
+import { getIndexableTickers } from "@/lib/rankings";
 
 /** Sitemaps cap at 50,000 URLs; split with generateSitemaps if companies ever exceed this. */
 const MAX_COMPANIES = 40_000;
@@ -14,11 +14,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [fresh, programs, companies, grantPrograms] = await Promise.all([
     prisma.dataFreshness.findUnique({ where: { source: "usaspending" } }),
     prisma.program.findMany({ select: { slug: true, updatedAt: true } }),
-    prisma.$queryRawUnsafe<{ ticker: string }[]>(
-      `SELECT DISTINCT c.ticker FROM "TickerMatch" tm JOIN "Company" c ON c.cik = tm."companyCik"
-       WHERE ${CONFIRMED_SQL} AND c.ticker NOT LIKE 'X:%' ORDER BY 1 LIMIT $1`,
-      MAX_COMPANIES,
-    ),
+    // Only companies with award data: empty company pages are thin content for search engines.
+    getIndexableTickers(MAX_COMPANIES),
     prisma.assistanceListingSummary.findMany({
       where: { plan: "pro" },
       orderBy: { total: "desc" },
@@ -29,6 +26,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const dataDate = fresh?.lastSuccessfulAt ?? new Date();
   return [
     { url: `${base}/`, changeFrequency: "daily", priority: 1 },
+    { url: `${base}/top-government-contractors`, lastModified: dataDate, changeFrequency: "daily", priority: 0.9 },
     { url: `${base}/programs`, lastModified: dataDate, changeFrequency: "daily", priority: 0.8 },
     { url: `${base}/grant-programs`, lastModified: dataDate, changeFrequency: "daily", priority: 0.6 },
     { url: `${base}/pricing`, changeFrequency: "monthly", priority: 0.5 },
@@ -42,8 +40,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "weekly" as const,
       priority: 0.4,
     })),
-    ...companies.map((c) => ({
-      url: `${base}/company/${encodeURIComponent(c.ticker)}`,
+    ...companies.map((ticker) => ({
+      url: `${base}/company/${encodeURIComponent(ticker)}`,
       lastModified: dataDate,
       changeFrequency: "daily" as const,
       priority: 0.6,

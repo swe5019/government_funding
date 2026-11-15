@@ -14,6 +14,9 @@ export function SiteHeader() {
           <Link href="/search" className="hover:text-fg">
             Search
           </Link>
+          <Link href="/top-government-contractors" className="hover:text-fg">
+            Top contractors
+          </Link>
           <Link href="/programs" className="hover:text-fg">
             Programs
           </Link>

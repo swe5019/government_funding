@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: PageProps<"/program/[slug]">)
   const { slug } = await params;
   const program = await getProgram(slug);
   return {
-    title: program ? `${program.name}: public company recipients` : "Program",
+    title: program ? `${program.name}: public companies receiving federal contracts and grants` : "Program",
     description: program?.description ?? undefined,
     alternates: { canonical: `/program/${slug}` },
   };
