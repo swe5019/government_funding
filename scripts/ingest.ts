@@ -33,7 +33,7 @@ Jobs:
       --limit <rows>       stop after N rows per chunk (smoke test)
       --lite               the last 2 years only (src/config/data.ts liteBackfill)
       --min-award <usd>    only awards with at least this total obligation (default: the storage
-                           cutoff in src/config/data.ts, $1M; 0 loads everything). Also applies to
+                           cutoff in src/config/data.ts, $100M; 0 loads everything). Also applies to
                            usaspending-daily, usaspending-file and prune-awards
   usaspending-daily      Load records modified since the last load, then roll up
   usaspending-file <path> Load a local bulk-download .zip or .csv
