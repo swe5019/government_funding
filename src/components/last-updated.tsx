@@ -19,7 +19,9 @@ export async function LastUpdated({ viewer }: { viewer: Viewer }) {
       ) : (
         <>No data loaded yet</>
       )}
-      {minAward > 0 && <> · Covers awards of {formatUsdCompact(minAward)} or more</>}
+      {minAward > 0 && (
+        <> · Only awards with a lifetime value of {formatUsdCompact(minAward)} or more, so smaller contracts are not counted</>
+      )}
       {delay > 0 && (
         <>
           {" "}
