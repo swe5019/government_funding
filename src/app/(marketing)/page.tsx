@@ -14,7 +14,7 @@ import { getTopContractors } from "@/lib/rankings";
 const FAQ: { q: string; a: string }[] = [
   {
     q: "Which public companies get the most government contracts?",
-    a: "Defense primes such as Lockheed Martin, RTX, General Dynamics, Boeing and Northrop Grumman usually lead. The top government contractors page ranks every public company by federal awards over the last 12 months.",
+    a: "Defense primes such as Lockheed Martin, RTX, General Dynamics, Boeing and Northrop Grumman usually lead. The top government contractors page ranks public companies by money obligated on large federal awards over the last 12 months.",
   },
   {
     q: "Where does the data come from?",
@@ -120,7 +120,7 @@ async function TopTen() {
         ))}
       </ol>
       <p className="text-xs text-muted">
-        Net obligations on awards of {formatUsdCompact(dataConfig.minAwardUsd)} or more, free view (7-day delay).
+        Money obligated in the last 12 months on awards with a lifetime value of {formatUsdCompact(dataConfig.minAwardUsd)} or more (free view, 7-day delay). Companies that mostly win smaller contracts are understated.
       </p>
     </section>
   );

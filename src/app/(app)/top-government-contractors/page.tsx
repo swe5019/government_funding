@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { JsonLd } from "@/components/json-ld";
 import { LastUpdated } from "@/components/last-updated";
 import { UpgradeNotice } from "@/components/upgrade-notice";
+import { dataConfig } from "@/config/data";
 import { siteConfig } from "@/config/site";
 import { displayCompanyName, formatUsdCompact } from "@/lib/format";
 import { getViewer } from "@/lib/gating/viewer";
@@ -13,7 +14,7 @@ import { getTopContractors } from "@/lib/rankings";
 const LIMIT = 100;
 const title = "Top government contractors: public companies ranked by federal awards";
 const description =
-  "The 100 publicly traded companies receiving the most U.S. federal contract and grant money over the last 12 months, by stock ticker, with change vs the prior year and the top awarding agency. From official USAspending.gov records.";
+  "The publicly traded companies with the most U.S. federal money obligated on large contracts and grants over the last 12 months, by stock ticker, with change vs the prior year and the top awarding agency. From official USAspending.gov records.";
 
 export const metadata: Metadata = {
   title,
@@ -29,8 +30,10 @@ export default function TopContractorsPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Top government contractors among public companies</h1>
         <p className="max-w-3xl text-sm text-muted">
           Publicly traded companies ranked by the federal contract and grant money obligated to them over the last 12
-          months. Totals are net (new awards and modifications minus de-obligations) and come from official
-          USAspending.gov records, linked to stock tickers. Click a company for every award, agency and program.
+          months, from official USAspending.gov records linked to stock tickers. Only awards with a lifetime value of{" "}
+          {formatUsdCompact(dataConfig.minAwardUsd)} or more are included, and the amounts are what was obligated on
+          them in the last 12 months (net of de-obligations). Large awards are funded in pieces over several years, so a
+          company can show a small figure here, and companies that mostly win smaller contracts are understated.
         </p>
       </header>
       <Suspense fallback={<div className="h-96 animate-pulse rounded-md bg-line" aria-busy="true" />}>
@@ -72,7 +75,7 @@ async function Rankings() {
               <tr>
                 <th className="px-3 py-2 font-medium">#</th>
                 <th className="px-3 py-2 font-medium">Company</th>
-                <th className="px-3 py-2 text-right font-medium">Last 12 months</th>
+                <th className="px-3 py-2 text-right font-medium">Obligated last 12 months</th>
                 <th className="hidden px-3 py-2 text-right font-medium sm:table-cell">vs prior year</th>
                 <th className="hidden px-3 py-2 font-medium md:table-cell">Top agency</th>
               </tr>

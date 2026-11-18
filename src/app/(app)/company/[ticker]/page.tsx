@@ -17,6 +17,7 @@ import { MatchBadge } from "@/components/match-badge";
 import { SourceLink } from "@/components/source-link";
 import { JsonLd } from "@/components/json-ld";
 import { StatTile } from "@/components/stat-tile";
+import { dataConfig } from "@/config/data";
 import { siteConfig } from "@/config/site";
 import {
   AWARD_EVENT_MIN_USD,
@@ -45,7 +46,7 @@ export async function generateMetadata({ params }: PageProps<"/company/[ticker]"
   const title = `${who} government contracts and federal awards`;
   const description = snip
     ? snip.last12 > 0
-      ? `${who} received ${formatUsdCompact(snip.last12)} in U.S. federal contracts and grants over the last 12 months${snip.topAgency ? `, mostly from the ${snip.topAgency}` : ""}. See every award, agency and program, from official USAspending.gov records.`
+      ? `${who} had ${formatUsdCompact(snip.last12)} obligated on large U.S. federal contracts and grants (lifetime value ${formatUsdCompact(dataConfig.minAwardUsd)}+) over the last 12 months${snip.topAgency ? `, mostly from the ${snip.topAgency}` : ""}. Awards, agencies and programs from official USAspending.gov records.`
       : `Federal contracts, grants and program awards linked to ${who}, by month, agency and program, from official USAspending.gov records.`
     : `Federal contracts, grants and program awards linked to ${t}, from official U.S. government records.`;
   const url = `/company/${encodeURIComponent(t)}`;
